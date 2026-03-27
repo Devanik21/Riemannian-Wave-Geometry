@@ -1,0 +1,237 @@
+# ============================================================
+# NEW INVENTIONS: RWC & GWL (MANIFOLD FORESTS)
+# Fully Optimized for T4 GPU Accuracy & Speed
+# Authors: Debanik Debnath + Xylia
+# ============================================================
+
+import subprocess, sys, time, warnings
+import numpy as np
+import openml
+import cupy as cp
+import cuml
+from cupyx import scatter_add
+from cuml.neighbors import NearestNeighbors as cuNN
+from sklearn.preprocessing import RobustScaler, LabelEncoder
+from sklearn.model_selection import StratifiedShuffleSplit, train_test_split
+from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.ensemble import BaggingClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
+from scipy.sparse import csr_matrix, diags
+
+warnings.filterwarnings("ignore")
+print(f"✓ GPU detected: {cp.cuda.runtime.getDeviceProperties(0)['name'].decode()}")
+print(f"  VRAM: {cp.cuda.Device(0).mem_info[1] / 1e9:.1f} GB")
+
+# ── DATA LOADING ──
+print("\nLoading EEG Eye State corpus (OpenML 1471)...")
+dataset = openml.datasets.get_dataset(1471)
+X_raw, y_raw, _, _ = dataset.get_data(target=dataset.default_target_attribute)
+X_raw = X_raw.values.astype(np.float64)
+le = LabelEncoder()
+y_raw = le.fit_transform(y_raw.astype(int).values)
+
+# EEG Preprocessing (Bipolar Montage + Spectral + Robust Scaling)
+def bipolar_montage(X):
+    X = np.clip(X, -15, 15)
+    X_diff = X[:, :-1] - X[:, 1:]
+    X_coh  = np.var(X, axis=1, keepdims=True)
+    return np.hstack([X, X_diff, X_coh])
+
+def spectral_transform(X, n_bins=50):
+    return np.abs(np.fft.rfft(X, axis=1))[:, :n_bins]
+
+scaler = RobustScaler(quantile_range=(15.0, 85.0))
+X_bip = bipolar_montage(X_raw)
+X_spec = spectral_transform(X_raw)
+X_processed = scaler.fit_transform(np.hstack([X_bip, X_spec]))
+print(f"  Processed Shape (with Spectral): {X_processed.shape}")
+
+# ── RWC IMPLEMENTATION ──
+class RiemannianWaveClassifier(BaseEstimator, ClassifierMixin):
+    def __init__(self, n_components=128, k_neighbors=15, n_freq=30,
+                 epsilon=0.1, potential_strength=15.0, diffusion_time=0.5):
+        self.n_components = n_components
+        self.k_neighbors = k_neighbors
+        self.n_freq = n_freq
+        self.epsilon = epsilon
+        self.potential_strength = potential_strength
+        self.diffusion_time = diffusion_time
+
+    def _build_manifold(self, X):
+        N = len(X)
+        k = min(self.k_neighbors, N - 1)
+        X_gpu = cp.asarray(X, dtype=cp.float32)
+        nbrs = cuNN(n_neighbors=k, metric='euclidean')
+        nbrs.fit(X_gpu)
+        dists_gpu, indices_gpu = nbrs.kneighbors(X_gpu)
+
+        # ZERO CHEATING FIX: Zelnik-Manor Local Geometry
+        sigma_i = dists_gpu[:, -1]
+        sigma_j = sigma_i[indices_gpu]
+
+        W_dense = cp.exp(-dists_gpu**2 / (sigma_i[:, None] * sigma_j + 1e-12))
+        W = cp.zeros((N, N), dtype=cp.float32)
+        scatter_add(W, (cp.arange(N)[:, None], indices_gpu), W_dense)
+        W = (W + W.T) / 2.0
+
+        d = cp.sum(W, axis=1)
+        d_i = cp.where(d > 0, 1.0 / cp.sqrt(d), 0.0)
+        L = cp.eye(N) - (d_i[:, None] * W * d_i[None, :])
+
+        vals, vecs = cp.linalg.eigh(L)
+        return vecs[:, 1:self.n_components+1], vals[1:self.n_components+1]
+
+    def _wave_energy_batch(self, phi_q, phi_c_train, mu_c):
+        phi_q_g = cp.asarray(phi_q, dtype=cp.float32)
+        phi_c_g = cp.asarray(phi_c_train, dtype=cp.float32)
+        mu_c_g = cp.asarray(mu_c, dtype=cp.float32)
+
+        freqs = cp.linspace(0.01, cp.max(cp.abs(mu_c_g)) + 1.0, self.n_freq)
+        w_sq = freqs**2
+
+        # Lorentzian resonance kernel
+        lor = self.epsilon / (cp.pi * ((w_sq[:, None] - cp.abs(mu_c_g[None, :]))**2 + self.epsilon**2))
+
+        # ZERO CHEATING FIX: Prevent destructive interference.
+        # Calculate resonance for individual local waves, then integrate total energy.
+        energies = cp.zeros((phi_q_g.shape[0],), dtype=cp.float32)
+        batch_size = 500  # VRAM safety
+
+        for i in range(0, phi_c_g.shape[0], batch_size):
+            phi_c_batch = phi_c_g[i:i+batch_size]
+            # Einstein summation: [batch_query, batch_class, frequencies]
+            K_batch = cp.einsum('fm,qm,cm->qcf', lor, phi_q_g, phi_c_batch)
+            energies += cp.sum(K_batch, axis=(1, 2))
+
+        return cp.asnumpy(energies)
+
+    def fit(self, X, y):
+        self.classes_ = np.unique(y)
+        # ZERO CHEATING: RWC uses the static, curved manifold (No Ricci Flow)
+        phi_g, lam_g = self._build_manifold(X)
+        self.phi_ = cp.asnumpy(phi_g)
+
+        self.potentials_ = []
+        self.phi_class_ = {}
+        for c in self.classes_:
+            V_diag = cp.where(cp.asarray(y) == c, -self.potential_strength, self.potential_strength * 0.5)
+            V_proj = cp.sum(V_diag[:, None] * phi_g**2, axis=0)
+            self.potentials_.append(cp.asnumpy(lam_g + V_proj))
+            self.phi_class_[c] = self.phi_[y == c]
+        self.X_train_ = X
+        return self
+
+
+
+    def predict(self, X):
+        X_train_g, X_new_g = cp.asarray(self.X_train_, dtype=cp.float32), cp.asarray(X, dtype=cp.float32)
+        nbrs = cuNN(n_neighbors=8).fit(X_train_g)
+        dists_g, idx_g = nbrs.kneighbors(X_new_g)
+        dists, idx = cp.asnumpy(dists_g), cp.asnumpy(idx_g)
+        B, m = len(X), self.phi_.shape[1]
+        phi_q = np.zeros((B, m))
+        for i in range(B):
+            w = np.exp(-dists[i]**2 / (2 * (dists[i].mean() + 1e-8)**2))
+            phi_q[i] = (w / (w.sum() + 1e-12)) @ self.phi_[idx[i]]
+        energies = np.zeros((B, len(self.classes_)))
+        for ci, c in enumerate(self.classes_):
+            energies[:, ci] = self._wave_energy_batch(phi_q, self.phi_class_[c], self.potentials_[ci])
+        return self.classes_[np.argmax(energies, axis=1)]
+
+# ── GWL IMPLEMENTATION ──
+class GeometricWaveLearner(RiemannianWaveClassifier):
+    def __init__(self, k_neighbors=20, flow_steps=10, flow_lr=0.08, **kwargs):
+        super().__init__(k_neighbors=k_neighbors, **kwargs)
+        self.flow_steps = flow_steps
+        self.flow_lr = flow_lr
+
+    def _ricci_flow_gpu(self, W, y_gpu):
+        mask = (W > 1e-10) # Crucial: Only flow along existing topological fabric
+        for _ in range(self.flow_steps):
+            deg = cp.sum(W, axis=1); d_inv = 1.0 / (deg + 1e-12)
+            base = W * (d_inv[:, None] + d_inv[None, :])
+            S = cp.sqrt(W); D_S = cp.sum(S, axis=1)
+
+            penalty = cp.zeros_like(W)
+            penalty[mask] = (D_S[:, None] + D_S[None, :] - 2 * S)[mask] / (S[mask] + 1e-12)
+            kappa = (base - W * penalty) * mask
+
+            # ZERO CHEATING FIX: Apply label attraction/repulsion ONLY to valid edges
+            T = cp.zeros_like(W)
+            same_class = (y_gpu[:, None] == y_gpu[None, :])
+            T[mask & same_class] = W[mask & same_class] * self.flow_lr
+            T[mask & ~same_class] = -W[mask & ~same_class] * self.flow_lr
+
+            W = cp.clip(W + self.flow_lr * kappa * W + T, 0, None)
+            W = (W + W.T) / 2.0
+        return W
+
+    def fit(self, X, y):
+        self.classes_ = np.unique(y)
+        N = len(X)
+        X_gpu = cp.asarray(X, dtype=cp.float32)
+        nbrs = cuNN(n_neighbors=self.k_neighbors).fit(X_gpu)
+        dists_g, idx_g = nbrs.kneighbors(X_gpu)
+
+        # ZERO CHEATING FIX: Local Zelnik-Manor bandwidth
+        sigma_i = dists_g[:, -1]
+        sigma_j = sigma_i[idx_g]
+        W_init = cp.exp(-dists_g**2 / (sigma_i[:, None] * sigma_j + 1e-12))
+
+        W = cp.zeros((N, N), dtype=cp.float32)
+        scatter_add(W, (cp.arange(N)[:, None], idx_g), W_init)
+        W = (W + W.T) / 2.0
+
+        # GWL DOES use Ricci Flow to evolve the manifold
+        W_evolved = self._ricci_flow_gpu(W, cp.asarray(y, dtype=cp.int32))
+
+        d = cp.sum(W_evolved, axis=1)
+        d_i = cp.where(d > 0, 1.0 / cp.sqrt(d), 0.0)
+        L = cp.eye(N) - (d_i[:, None] * W_evolved * d_i[None, :])
+        vals, vecs = cp.linalg.eigh(L)
+        phi_g, lam_g = vecs[:, 1:self.n_components+1], vals[1:self.n_components+1]
+
+        self.phi_ = cp.asnumpy(phi_g)
+        self.potentials_ = []
+        self.phi_class_ = {}
+        for c in self.classes_:
+            V_proj = cp.sum(cp.where(cp.asarray(y)==c, -self.potential_strength, self.potential_strength*0.5)[:, None] * phi_g**2, axis=0)
+            self.potentials_.append(cp.asnumpy(lam_g + V_proj))
+            self.phi_class_[c] = self.phi_[y == c]
+        self.X_train_ = X
+        return self
+
+# ── ENSEMBLE WRAPPERS ──
+# ── ENSEMBLE WRAPPERS ──
+class RWCEnsemble(BaseEstimator, ClassifierMixin):
+    def __init__(self, n_estimators=15, max_samples=0.75):
+        self.n_estimators = n_estimators
+        self.max_samples = max_samples
+    def fit(self, X, y):
+        self.bag_ = BaggingClassifier(estimator=RiemannianWaveClassifier(), n_estimators=self.n_estimators, max_samples=self.max_samples, bootstrap=True, random_state=42).fit(X, y)
+        return self
+    def predict(self, X): return self.bag_.predict(X)
+
+class GWLEnsemble(BaseEstimator, ClassifierMixin):
+    def __init__(self, n_estimators=15, max_samples=0.75):
+        self.n_estimators = n_estimators
+        self.max_samples = max_samples
+    def fit(self, X, y):
+        self.bag_ = BaggingClassifier(estimator=GeometricWaveLearner(), n_estimators=self.n_estimators, max_samples=self.max_samples, bootstrap=True, random_state=42).fit(X, y)
+        return self
+    def predict(self, X): return self.bag_.predict(X)
+
+# ── BENCHMARK RUN ──
+if __name__ == "__main__":
+    split = StratifiedShuffleSplit(n_splits=1, test_size=0.25, random_state=42)
+    for tr, te in split.split(X_processed, y_raw):
+        X_tr, X_te = X_processed[tr], X_processed[te]
+        y_tr, y_te = y_raw[tr], y_raw[te]
+    print("\n" + "="*50 + "\n  NEW INVENTIONS BENCHMARK (T4 GPU)\n" + "="*50)
+    for name, clf in [("RWC Ensemble", RWCEnsemble()), ("GWL Ensemble", GWLEnsemble())]:
+        print(f"\n▶ Training {name}...")
+        t0 = time.time()
+        clf.fit(X_tr, y_tr)
+        acc = accuracy_score(y_te, clf.predict(X_te))
+        print(f"  Accuracy: {acc*100:.2f}%  [{time.time()-t0:.1f}s]")
