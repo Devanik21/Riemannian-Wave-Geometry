@@ -510,8 +510,8 @@ with tabs[1]:
                 mc  = MODE_COLOR.get(r['mode'], '#7DF9FF')
                 ebar = '|' * min(10, int(r['energy']))
                 rows_html.append(
-                    f"<div class='agent-card' style='border-left-color:{r[\"color\"]}'>"
-                    f"<span style='color:{r[\"color\"]};font-weight:bold'>{r['id']}</span> "
+                    f"<div class='agent-card' style='border-left-color:{r['color']}'>"
+                    f"<span style='color:{r['color']};font-weight:bold'>{r['id']}</span> "
                     f"<span style='color:#334'>[{r['tribe']}]</span>  "
                     f"<span style='color:{mc}'>{mi}{r['mode'][:4]}</span>  "
                     f"<span style='color:#7DF9FF'>{ebar}</span> {r['energy']:.1f}e  "
@@ -635,8 +635,8 @@ with tabs[2]:
                 ally_str = "🤝" * min(r['allies'], 5)
                 bar      = '█' * min(10, int(r['power'] / 5))
                 st.markdown(
-                    f"<div class='agent-card' style='border-left-color:{r[\"color\"]}'>"
-                    f"<span style='color:{r[\"color\"]};font-weight:bold'>{r['id']}</span>  "
+                    f"<div class='agent-card' style='border-left-color:{r['color']}'>"
+                    f"<span style='color:{r['color']};font-weight:bold'>{r['id']}</span>  "
                     f"👥{r['members']}  pwr:{r['power']:.0f}  💡{r['disc']}  "
                     f"{war_str}{ally_str}<br>"
                     f"<span style='color:#334'>{bar}</span>"
