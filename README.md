@@ -20,6 +20,11 @@
 
 ---
 
+# The Benchmark
+
+<img width="1667" height="1067" alt="image" src="https://github.com/user-attachments/assets/ab0acef9-6955-477f-b115-4fb57ed1b305" />
+
+
 ## Table of Contents
 
 1. [Abstract](#abstract)
