@@ -281,13 +281,18 @@ Any pair of samples whose row indices differ by at most 2 (i.e., recorded within
 
 **Phase-Aligned Constructive Interference.** This is the most novel prediction mechanism in V14. In V13, the HRF energy $E_{\text{HRF}}$ uses only the Euclidean distance $d_{qi}$ to weight neighbors. In SCWH, I also incorporate the **manifold amplitude** — the spectral similarity between the query and each neighbor:
 
-$$\text{manifold\_amp}_i = \left| \Phi_{\text{trunc}}[i, :] \cdot \phi_q \right| \in \mathbb{R}^k$$
+$$
+\mathrm{manifold\_amp}_i = \left| \Phi_{\mathrm{trunc}}[i, :] \cdot \phi_q \right| \in \mathbb{R}^k
+$$
+
 
 This is the element-wise dot product between each neighbor's eigenvector row and the query's interpolated spectral coordinate. It measures how much the neighbor's wave mode "agrees" with the query's spectral position. A neighbor that is both geometrically close *and* spectrally aligned with the query receives amplified weight.
 
 The combined holographic weight per neighbor:
 
-$$\psi_i = \underbrace{\left|\Phi[i,:] \cdot \phi_q\right|}_{\text{manifold amplitude}} \cdot \underbrace{\exp(-\gamma d_i^2)}_{\text{Gaussian envelope}} \cdot \underbrace{(1 + \cos(\omega d_i))}_{\text{phase fringe}}$$
+$$
+\psi_i = \underbrace{\left|\Phi[i,:] \cdot \phi_q\right|}_{\text{manifold amplitude}} \cdot \underbrace{\exp(-\gamma d_i^2)}_{\text{Gaussian envelope}} \cdot \underbrace{(1 + \cos(\omega d_i))}_{\text{phase fringe}}
+$$
 
 The connection to holography: in optical holography, the reconstruction of an image from a hologram involves **constructive interference** — light waves from the reference beam and the object beam reinforce each other only where their phases align. Here, the manifold amplitude term plays the role of the phase coherence measurement: it is high only where the neighbor's wave mode is in phase with the query's spectral position on the manifold.
 
@@ -475,35 +480,51 @@ The directions I'm most interested in pursuing:
 ## Appendix: Key Equations Reference
 
 **Zelnik-Manor Affinity:**
+
 $$W_{ij} = \exp\!\left(-\frac{\|x_i - x_j\|^2}{\sigma_i \sigma_j + \varepsilon}\right), \quad \sigma_i = d(x_i, x_{(k)}^i)$$
 
 **Symmetric Normalized Laplacian:**
+
 $$\mathcal{L} = I - D^{-1/2} W D^{-1/2}, \quad \text{spectrum} \in [0,2]$$
 
 **Class Potential and Perturbed Resonance Levels:**
+
 $$V^{(c)}_{ii} = \begin{cases} -\alpha & y_i = c \\ +\alpha/2 & y_i \neq c \end{cases}, \quad \mu_m^{(c)} = \lambda_m + \langle\phi_m, V^{(c)}\phi_m\rangle$$
 
 **Lorentzian Resonance Energy:**
+
 $$E(q,c) = \sum_f \sum_m \sum_{s \in \mathcal{S}_c} \frac{\varepsilon}{\pi[(\omega_f^2 - |\mu_m^{(c)}|)^2 + \varepsilon^2]} \langle\phi_q,\phi_m\rangle\langle\phi_m,\phi_s\rangle$$
 
 **Ollivier-Ricci Curvature Approximation:**
+
 $$\kappa_{ij} = \left(W_{ij}\left(\frac{1}{\deg_i}+\frac{1}{\deg_j}\right) - W_{ij} \cdot \frac{D_{\sqrt{W}}(i) + D_{\sqrt{W}}(j) - 2\sqrt{W_{ij}}}{\sqrt{W_{ij}}+\varepsilon}\right) \cdot \mathbf{1}[W_{ij}>10^{-10}]$$
 
 **Label-Driven Ricci Flow Euler Step:**
+
 $$W^{(t+1)} = \text{clip}\!\left(W^{(t)} + \eta\,\kappa^{(t)} W^{(t)} + \mathcal{T}^{(t)}, 0, +\infty\right), \quad \text{then symmetrize}$$
 
 **HRF Kernel:**
+
 $$\Psi(d; \omega, \gamma) = \exp(-\gamma d^2)(1 + \cos(\omega d))$$
 
 **SCWH Phase-Aligned Energy:**
+
 $$\psi_i = |\Phi[i,:]\cdot\phi_q| \cdot \exp(-\gamma d_i^2) \cdot (1 + \cos(\omega d_i))$$
+
 $$E_{\text{SCWH}}(q,c) = \frac{\sum_i w_i^{\text{proj}} \mathbf{1}[y_i=c]}{\sum_i w_i^{\text{proj}} + \varepsilon} + 2.0\sum_i \psi_i \mathbf{1}[y_i=c]$$
 
 **AQGL Gravity Warping:**
-$$d'_{ij} = d_{ij} \cdot e^{-\alpha \cdot \mathbf{1}[y_i=y_j] + \alpha \cdot \mathbf{1}[y_i \neq y_j]}, \quad \alpha = 2.5$$
+
+$$
+d'_{ij} = d_{ij} \cdot e^{-\alpha \cdot \mathbf{1}[y_i=y_j] + \alpha \cdot \mathbf{1}[y_i \neq y_j]}, \quad \alpha = 2.5
+$$
 
 **MFT-HRF 3D Tensor:**
-$$\mathbf{W}[b,j,f] = \exp(-\gamma_f d_{bj}^2)(1+\cos(\omega_f d_{bj})), \quad \text{Hard gate: } \begin{cases} w^2 & w > \bar{w} \\ 0 & w \leq \bar{w} \end{cases}$$
+
+$$
+\mathbf{W}[b,j,f] = \exp(-\gamma_f d_{bj}^2)(1+\cos(\omega_f d_{bj})), \quad \text{Hard gate: } \begin{cases} w^2 & w > \bar{w} \\ 0 & w \leq \bar{w} \end{cases}
+$$
+
 
 ---
 
