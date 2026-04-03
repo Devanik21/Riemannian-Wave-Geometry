@@ -24,7 +24,7 @@ import time
 # ── Page must be very first Streamlit call ────────────────────────────────────
 st.set_page_config(
     page_title="EVENT HORIZON",
-    page_icon="🌀",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -188,7 +188,7 @@ R_NAMES  = ['Food','Energy Crystal','Knowledge Ore','Rare Element']
 # SIDEBAR
 # ══════════════════════════════════════════════════════════════════════════════
 with st.sidebar:
-    st.markdown("# 🌀 EVENT HORIZON")
+    st.markdown("#  EVENT HORIZON")
     st.markdown(
         "<div style='color:#334;font-size:0.72em;letter-spacing:1px;'>"
         "SPECTRAL LIFE · 96 HYPERAGENTS · K=32<br>"
@@ -287,7 +287,7 @@ cstats       = C.get_stats()
 # HEADLINE + KPI STRIP
 # ══════════════════════════════════════════════════════════════════════════════
 st.markdown(
-    f"<h1 style='margin-bottom:0;padding-bottom:2px;'>🌀 EVENT HORIZON</h1>"
+    f"<h1 style='margin-bottom:0;padding-bottom:2px;'> EVENT HORIZON</h1>"
     f"<div style='color:#223;font-size:0.74em;font-family:monospace;padding-bottom:10px;'>"
     f"tick {W.step_count:,} &nbsp;·&nbsp; {n_alive} alive "
     f"&nbsp;·&nbsp; {cstats.get('n_tribes',0)} tribes "
