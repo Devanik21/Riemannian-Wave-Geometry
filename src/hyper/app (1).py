@@ -347,7 +347,6 @@ st.divider()
 # TAB 1  ─  WORLD MAP
 # ══════════════════════════════════════════════════════════════════════════════
 if st.session_state.active_tab == "🌍 WORLD MAP":
-with tabs[0]:
     map_col, info_col = st.columns([2.8, 1])
 
     with map_col:
@@ -503,7 +502,6 @@ with tabs[0]:
 # TAB 2  ─  AGENTS
 # ══════════════════════════════════════════════════════════════════════════════
 elif st.session_state.active_tab == "🧬 AGENTS":
-with tabs[1]:
     st.markdown(
         "<div class='section-title'>BioHyperAgent Census · Live Population</div>",
         unsafe_allow_html=True
@@ -622,7 +620,6 @@ with tabs[1]:
 # TAB 3  ─  CIVILIZATION
 # ══════════════════════════════════════════════════════════════════════════════
 elif st.session_state.active_tab == "🏛 CIVILIZATION":
-with tabs[2]:
     civ_left, civ_right = st.columns([1.6, 1])
 
     with civ_left:
@@ -741,7 +738,6 @@ with tabs[2]:
 # TAB 4  ─  TECH TREE
 # ══════════════════════════════════════════════════════════════════════════════
 elif st.session_state.active_tab == "💡 TECH TREE":
-with tabs[3]:
     tech = C.tech   # TechTree: .nodes dict, .edges list[tuple], .global_bonus, .summary_by_category()
 
     tt_left, tt_right = st.columns([1.6, 1])
@@ -863,7 +859,6 @@ with tabs[3]:
 # TAB 5  ─  ANALYTICS
 # ══════════════════════════════════════════════════════════════════════════════
 elif st.session_state.active_tab == "📊 ANALYTICS":
-with tabs[4]:
     st.markdown(
         "<div class='section-title'>Population & Civilization Analytics</div>",
         unsafe_allow_html=True
@@ -996,7 +991,6 @@ with tabs[4]:
 # TAB 6  ─  HRC BRAIN INSPECTOR
 # ══════════════════════════════════════════════════════════════════════════════
 elif st.session_state.active_tab == "🔬 HRC BRAIN":
-with tabs[5]:
     st.markdown(
         "<div class='section-title'>"
         "Harmonic Resonance Consciousness · Deep Brain Inspector"
@@ -1286,7 +1280,6 @@ with tabs[5]:
 # TAB 7  ─  EVENTS FEED
 # ══════════════════════════════════════════════════════════════════════════════
 elif st.session_state.active_tab == "📡 EVENTS FEED":
-with tabs[6]:
     ev_l, ev_r = st.columns(2)
 
     with ev_l:
@@ -1352,7 +1345,6 @@ with tabs[6]:
 # TAB 8  ─  RESOURCES
 # ══════════════════════════════════════════════════════════════════════════════
 elif st.session_state.active_tab == "🗺 RESOURCES":
-with tabs[7]:
     st.markdown(
         "<div class='section-title'>Resource Field · Per-Layer Analysis</div>",
         unsafe_allow_html=True
@@ -1465,7 +1457,6 @@ with tabs[7]:
 # TAB 9  ─  META-MIND (NEW)
 # ══════════════════════════════════════════════════════════════════════════════
 elif st.session_state.active_tab == "🧠 META-MIND":
-with tabs[8]:
     st.markdown(
         "<div class='section-title'>🧠 Metacognitive Landscape · Self-Modifying Intelligence</div>",
         unsafe_allow_html=True
@@ -1618,7 +1609,7 @@ with tabs[8]:
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 10  ─  KNOWLEDGE PHYSICS (NEW)
 # ══════════════════════════════════════════════════════════════════════════════
-with tabs[9]:
+elif st.session_state.active_tab == "🔬 KNOWLEDGE":
     st.markdown(
         "<div class='section-title'>🔬 Knowledge Physics · Ambient Intelligence Field</div>",
         unsafe_allow_html=True
