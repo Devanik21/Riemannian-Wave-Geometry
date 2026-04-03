@@ -1,5 +1,5 @@
 """
-app.py  ─  HYPER-HORIZON: Spectral Life Simulator
+app.py  ─  HyPER AgEnT: Spectral Life Simulator
 ==================================================
 The complete Streamlit frontend, perfectly wired to:
   consciousness.py  →  HarmonicResonanceConsciousness, CognitionMode, ACTIONS, K_DIM, E
@@ -23,7 +23,7 @@ import time
 
 # ── Page must be very first Streamlit call ────────────────────────────────────
 st.set_page_config(
-    page_title="HYPER-HORIZON",
+    page_title="HyPER AgEnT",
     page_icon="",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -188,7 +188,7 @@ R_NAMES  = ['Food','Energy Crystal','Knowledge Ore','Rare Element']
 # SIDEBAR
 # ══════════════════════════════════════════════════════════════════════════════
 with st.sidebar:
-    st.markdown("#  HYPER-HORIZON")
+    st.markdown("#  HyPER AgEnT")
     st.markdown(
         "<div style='color:#334;font-size:0.72em;letter-spacing:1px;'>"
         "SPECTRAL LIFE · 96 HYPERAGENTS · K=32<br>"
@@ -287,7 +287,7 @@ cstats       = C.get_stats()
 # HEADLINE + KPI STRIP
 # ══════════════════════════════════════════════════════════════════════════════
 st.markdown(
-    f"<h1 style='margin-bottom:0;padding-bottom:2px;'> HYPER-HORIZON</h1>"
+    f"<h1 style='margin-bottom:0;padding-bottom:2px;'> HyPER AgEnT</h1>"
     f"<div style='color:#223;font-size:0.74em;font-family:monospace;padding-bottom:10px;'>"
     f"tick {W.step_count:,} &nbsp;·&nbsp; {n_alive} alive "
     f"&nbsp;·&nbsp; {cstats.get('n_tribes',0)} tribes "
@@ -1786,7 +1786,7 @@ st.divider()
 st.markdown(
     "<div style='text-align:center;font-family:monospace;font-size:10px;"
     "color:#151530;padding:8px'>"
-    "HYPER-HORIZON v2.0 · HyperAgent Edition · K_DIM=32 · 96 Agents<br>"
+    "HyPER AgEnT v2.0 · HyperAgent Edition · K_DIM=32 · 96 Agents<br>"
     "Metacognitive Self-Modification · Gödel-Encoded Inventions · Zero LLM<br>"
     "Invented by Devanik &amp; Claude (Xylia) · 2025"
     "</div>",
