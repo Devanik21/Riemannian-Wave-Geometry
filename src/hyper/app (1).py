@@ -178,6 +178,7 @@ EVT_COLOR = {
     'war':'#FF4455','alliance':'#44FF88','invention':'#FFD700',
     'new_tribe':'#7DF9FF','extinction':'#FF8800','abundance':'#98FB98',
     'scarcity':'#FF6600','anomaly':'#DDA0DD','plague':'#FF4455',
+    'breakthrough':'#00FF88','schism':'#FF8C00',
 }
 R_COLORS = ['#44FF88','#FFD700','#DDA0DD','#FF8C00']
 R_NAMES  = ['Food','Energy Crystal','Knowledge Ore','Rare Element']
@@ -190,8 +191,8 @@ with st.sidebar:
     st.markdown("# 🌀 EVENT HORIZON")
     st.markdown(
         "<div style='color:#334;font-size:0.72em;letter-spacing:1px;'>"
-        "SPECTRAL LIFE · 128 BIOHYPERAGENTS<br>"
-        "HRC Wave Brain · Emergent Civilization"
+        "SPECTRAL LIFE · 96 HYPERAGENTS · K=32<br>"
+        "HRC + Metacognition · Zero LLM"
         "</div>", unsafe_allow_html=True
     )
     st.divider()
@@ -294,11 +295,13 @@ st.markdown(
     f"&nbsp;·&nbsp; 🤝 {cstats.get('active_alliances',0)} alliances "
     f"&nbsp;·&nbsp; 💡 {cstats.get('total_inventions',0)} inventions "
     f"&nbsp;·&nbsp; Gen {estats.get('max_generation',0)}"
+    f"&nbsp;·&nbsp; 🧠 {estats.get('total_meta_inv',0)} meta-inv"
+    f"&nbsp;·&nbsp; 🌋 {estats.get('n_cambrian',0)} cambrian"
     f"</div>",
     unsafe_allow_html=True
 )
 
-m = st.columns(8)
+m = st.columns(10)
 m[0].metric("🧬 Alive",     n_alive)
 m[1].metric("🐣 Born",      estats.get('total_born', 0))
 m[2].metric("💀 Died",      estats.get('total_died', 0))
@@ -306,7 +309,9 @@ m[3].metric("⚡ Avg E",     f"{estats.get('avg_energy',0):.2f}")
 m[4].metric("🔬 Inventions",estats.get('total_inv', 0))
 m[5].metric("⚔ Kills",     estats.get('total_kills', 0))
 m[6].metric("❤ Children",  estats.get('total_kids', 0))
-m[7].metric("🧠 Tech×",    f"{cstats.get('tech_bonus',1):.4f}")
+m[7].metric("🧠 Meta-Inv",  estats.get('total_meta_inv', 0))
+m[8].metric("🔮 Clades",    estats.get('n_clades', 0))
+m[9].metric("📡 Tech×",    f"{cstats.get('tech_bonus',1):.4f}")
 
 st.divider()
 
@@ -323,6 +328,8 @@ tabs = st.tabs([
     "🔬 HRC BRAIN",
     "📡 EVENTS FEED",
     "🗺 RESOURCES",
+    "🧠 META-MIND",
+    "🔬 KNOWLEDGE",
 ])
 
 
@@ -493,7 +500,8 @@ with tabs[1]:
         sc1, sc2 = st.columns([2, 2])
         sort_key = sc1.selectbox(
             "Sort by",
-            ['energy','age','inventions','kills','children','reputation','wonder'],
+            ['energy','age','inventions','kills','children','reputation','wonder',
+             'meta_inv','eigenspread'],
             key='ag_sort',
         )
         n_show = sc2.slider("Show top N", 10, min(80, n_alive), 30, key='ag_n')
@@ -518,7 +526,10 @@ with tabs[1]:
                     f"hp:{r['health']:.2f} age:{r['age']} gen:{r['generation']}<br>"
                     f"<span style='color:#334'>last:{r['last_action']:<18} "
                     f"💡{r['inventions']} ❤{r['children']} ⚔{r['kills']} "
-                    f"rep:{r['reputation']:+.1f} 📦{r['absorbed']}</span>"
+                    f"rep:{r['reputation']:+.1f} 📦{r['absorbed']}</span><br>"
+                    f"<span style='color:#FF8C00'>⚙ meta-inv:{r.get('meta_inventions',0)} "
+                    f"composed:{r.get('composed_actions',0)} "
+                    f"eigen:{r.get('meta_eigenspread',0):.3f}</span>"
                     f"</div>"
                 )
             st.markdown("\n".join(rows_html), unsafe_allow_html=True)
@@ -859,6 +870,13 @@ with tabs[4]:
     sparkline(an2, eng_h, 'Avg Energy History',        '#FFD700', 'eng_an')
     sparkline(an3, inv_h, 'Total Inventions History',  '#DDA0DD', 'inv_an')
 
+    # Meta analytics
+    meta_h = estats.get('meta_inv_history', [])
+    nov_h  = estats.get('novelty_history', [])
+    an3b, an3c = st.columns(2)
+    sparkline(an3b, meta_h, 'Meta-Inventions Over Time', '#FF8C00', 'meta_an')
+    sparkline(an3c, nov_h,  'Novelty Index (Running Mean)', '#00FF88', 'nov_an')
+
     st.divider()
 
     an4, an5, an6 = st.columns(3)
@@ -883,7 +901,8 @@ with tabs[4]:
     if alive_agents:
         histogram(an4, [a.age        for a in alive_agents], 'Age Distribution',        '#9370DB', 'age_hist')
         histogram(an5, [a.energy     for a in alive_agents], 'Energy Distribution',      '#FFD700', 'edist')
-        histogram(an6, [a.reputation for a in alive_agents], 'Reputation Distribution',  '#98FB98', 'rep_hist')
+        histogram(an6, [a.meta.eigenspread() for a in alive_agents
+                        if hasattr(a,'meta') and a.meta],    'Meta Eigenspread Dist.',   '#FF8C00', 'eigen_hist')
 
     st.divider()
 
@@ -980,15 +999,17 @@ with tabs[5]:
             br_c3.metric("Energy", d['energy'])
 
             # Full stats strip
-            bs = st.columns(8)
+            bs = st.columns(10)
             bs[0].metric("Health",    f"{d['health']:.2f}")
             bs[1].metric("Age",       d['age'])
             bs[2].metric("Gen",       d['generation'])
             bs[3].metric("Inventions",d['inventions'])
-            bs[4].metric("Absorbed",  d['absorbed'])
-            bs[5].metric("Comms",     brain.n_comms)       # brain.n_comms
-            bs[6].metric("Reward Σ",  f"{brain.total_reward:.2f}")  # brain.total_reward
-            bs[7].metric("Tribe",     d['tribe'])
+            bs[4].metric("Meta-Inv",  d.get('meta_inventions', 0))
+            bs[5].metric("Composed",  d.get('composed_actions', 0))
+            bs[6].metric("Eigensprd", f"{d.get('meta_eigenspread',0):.3f}")
+            bs[7].metric("Comms",     brain.n_comms)
+            bs[8].metric("Reward Σ",  f"{brain.total_reward:.2f}")
+            bs[9].metric("Tribe",     d['tribe'])
 
             st.divider()
 
@@ -1131,28 +1152,43 @@ with tabs[5]:
             disc_col, act_col = st.columns(2)
 
             with disc_col:
-                st.markdown("<div class='section-title'>Personal Discoveries</div>",
+                st.markdown("<div class='section-title'>Personal Discoveries (Gödel Programs)</div>",
                             unsafe_allow_html=True)
-                # brain.discoveries dict: name → {name, type, signature, wonder, eigenmode}
+                # brain.discoveries: name → {name, type, signature, godel, program, wonder, eigenmode, diversity}
                 if brain.discoveries:
                     for name, inv in brain.discoveries.items():
                         cat   = inv.get('type','?')
                         color = TECH_COLOR.get(cat,'#888')
+                        prog_str = " → ".join(inv.get('program',[])) if 'program' in inv else ''
                         st.markdown(
                             f"<div class='event-line'>"
                             f"<span style='color:{color}'>{TECH_ICON.get(cat,'?')} <b>{name}</b></span>"
-                            f" <span style='color:#334'>wonder:{inv.get('wonder',0):.2f} "
-                            f"mode:{inv.get('eigenmode',0)}</span>"
+                            f" <span style='color:#334'>G:{inv.get('godel',0)} | {prog_str}</span><br>"
+                            f"<span style='color:#556'>wonder:{inv.get('wonder',0):.2f} "
+                            f"div:{inv.get('diversity',0):.2f} mode:{inv.get('eigenmode',0)}</span>"
                             f"</div>",
                             unsafe_allow_html=True
                         )
                 else:
                     st.caption("No personal discoveries yet.")
 
+                # Composed actions (new meta feature)
+                if brain.composed_actions:
+                    st.markdown("<div class='section-title' style='margin-top:8px'>Composed Actions</div>",
+                                unsafe_allow_html=True)
+                    for act_name, prog in list(brain.composed_actions.items())[-8:]:
+                        prog_str = " → ".join(prog)
+                        st.markdown(
+                            f"<div class='event-line'>"
+                            f"<span style='color:#FF8C00'>⚙ {act_name}</span>"
+                            f" <span style='color:#334'>{prog_str}</span>"
+                            f"</div>",
+                            unsafe_allow_html=True
+                        )
+
             with act_col:
                 st.markdown("<div class='section-title'>Action History</div>",
                             unsafe_allow_html=True)
-                # sel_agent.action_counts dict: action_name → count
                 ac = sel_agent.action_counts
                 if ac:
                     total_a = sum(ac.values())
@@ -1174,10 +1210,31 @@ with tabs[5]:
                 else:
                     st.caption("No actions recorded yet.")
 
+                # Meta-H eigenspectrum for selected agent
+                if sel_agent.meta is not None:
+                    meta_evals = sel_agent.meta._meta_evals.tolist()
+                    k_meta_labels = [f"m{i}" for i in range(len(meta_evals))]
+                    fig_meta_ev = go.Figure(go.Bar(
+                        x=k_meta_labels, y=meta_evals,
+                        marker=dict(
+                            color=['#FF8C00' if v >= 0 else '#FF4455' for v in meta_evals],
+                            line=dict(width=0),
+                        ),
+                    ))
+                    fig_meta_ev.update_layout(
+                        paper_bgcolor='#04040e', plot_bgcolor='#04040e',
+                        height=180, margin=dict(l=30,r=10,t=32,b=10),
+                        title=dict(text='Meta-H Eigenspectrum (Learning Algorithm)',
+                                   font=dict(color='#FF8C00',size=11)),
+                        xaxis=dict(color='#445', tickfont=dict(size=7)),
+                        yaxis=dict(gridcolor='#0d0d1e', color='#445'),
+                        font=dict(color='#445', size=9),
+                    )
+                    st.plotly_chart(fig_meta_ev, use_container_width=True, key='meta_eig')
+
             # Absorbed inventions list
             st.markdown("<div class='section-title'>Absorbed Inventions (cultural diffusion)</div>",
                         unsafe_allow_html=True)
-            # sel_agent.absorbed_inventions: List[str]
             if sel_agent.absorbed_inventions:
                 absorbed_html = " · ".join(
                     f"<span style='color:#334'>{n}</span>"
@@ -1356,6 +1413,328 @@ with tabs[7]:
                 )
 
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 9  ─  META-MIND (NEW)
+# ══════════════════════════════════════════════════════════════════════════════
+with tabs[8]:
+    st.markdown(
+        "<div class='section-title'>🧠 Metacognitive Landscape · Self-Modifying Intelligence</div>",
+        unsafe_allow_html=True
+    )
+    if not alive_agents:
+        st.warning("No agents alive.")
+    else:
+        mm1, mm2 = st.columns(2)
+
+        # ── Tribal meta-H eigenspectra ────────────────────────────────────────
+        with mm1:
+            st.markdown("<div class='section-title'>Tribal Epistemic Identities (meta-H eigenvalues)</div>",
+                        unsafe_allow_html=True)
+            fig_tribal = go.Figure()
+            for tid, tribe in C.tribes.items():
+                if tribe.tribal_meta_H is not None:
+                    evals = np.linalg.eigvalsh(tribe.tribal_meta_H)
+                    fig_tribal.add_trace(go.Scatter(
+                        y=evals, mode='lines+markers', name=tid,
+                        line=dict(width=1.5), marker=dict(size=4), opacity=0.85,
+                    ))
+            fig_tribal.update_layout(
+                paper_bgcolor='#04040e', plot_bgcolor='#04040e',
+                height=300, margin=dict(l=30,r=10,t=10,b=10),
+                title=dict(text='Each line = one tribe\'s learning paradigm',
+                           font=dict(color='#FF8C00',size=10)),
+                xaxis=dict(title='Eigenmode', color='#445', gridcolor='#0d0d1e'),
+                yaxis=dict(title='Eigenvalue', color='#445', gridcolor='#0d0d1e'),
+                legend=dict(font=dict(size=8,color='#556'), bgcolor='rgba(0,0,0,0.5)'),
+                font=dict(color='#445', size=9),
+            )
+            st.plotly_chart(fig_tribal, use_container_width=True, key='tribal_meta')
+
+        # ── Cognitive Clade Distribution ──────────────────────────────────────
+        with mm2:
+            st.markdown("<div class='section-title'>Cognitive Clade Distribution</div>",
+                        unsafe_allow_html=True)
+            phylo_stats = EN.phylo.get_stats()
+            clade_sizes = phylo_stats.get('clade_sizes', {})
+            if clade_sizes:
+                fig_clades = go.Figure(go.Bar(
+                    x=list(clade_sizes.keys()), y=list(clade_sizes.values()),
+                    marker=dict(color='#9370DB', line=dict(width=0)),
+                ))
+                fig_clades.update_layout(
+                    paper_bgcolor='#04040e', plot_bgcolor='#04040e',
+                    height=300, margin=dict(l=30,r=10,t=10,b=10),
+                    title=dict(text=f'{len(clade_sizes)} cognitive clades by member count',
+                               font=dict(color='#9370DB',size=10)),
+                    xaxis=dict(color='#445', tickfont=dict(size=7), tickangle=-45),
+                    yaxis=dict(title='Members', color='#445', gridcolor='#0d0d1e'),
+                    font=dict(color='#445', size=9),
+                )
+                st.plotly_chart(fig_clades, use_container_width=True, key='clade_bar')
+            else:
+                st.info("Run more ticks for clade data.")
+
+        st.divider()
+        mm3, mm4 = st.columns(2)
+
+        # ── Novelty Index ─────────────────────────────────────────────────────
+        with mm3:
+            st.markdown("<div class='section-title'>Discovery Novelty Index</div>",
+                        unsafe_allow_html=True)
+            ns = C.novelty_scorer.get_stats()
+            recent_novelty = ns.get('recent_novelty', [])
+            n_bk = ns.get('n_breakthroughs', 0)
+            col_ns1, col_ns2, col_ns3 = st.columns(3)
+            col_ns1.metric("Scored",       ns.get('total_scored', 0))
+            col_ns2.metric("Breakthroughs",n_bk)
+            col_ns3.metric("Running Mean", f"{ns.get('running_mean',0):.4f}")
+            if recent_novelty:
+                fig_nov = go.Figure(go.Scatter(
+                    y=recent_novelty, mode='lines',
+                    line=dict(color='#00FF88', width=2),
+                    fill='tozeroy', fillcolor='rgba(0,255,136,0.06)',
+                ))
+                # Mark breakthroughs
+                for bt in C.novelty_scorer.breakthroughs[-5:]:
+                    idx = bt.get('index', 0) - max(0, len(C.novelty_scorer.known_godels) - len(recent_novelty))
+                    if 0 <= idx < len(recent_novelty):
+                        fig_nov.add_annotation(
+                            x=idx, y=bt['novelty'], text="⭐",
+                            showarrow=True, arrowhead=2, arrowcolor='#FFD700',
+                            font=dict(size=12),
+                        )
+                fig_nov.update_layout(
+                    paper_bgcolor='#04040e', plot_bgcolor='#04040e',
+                    height=220, margin=dict(l=30,r=10,t=30,b=10),
+                    title=dict(text='Discovery Novelty (⭐ = Breakthrough)',
+                               font=dict(color='#00FF88',size=11)),
+                    xaxis=dict(color='#445', showgrid=False),
+                    yaxis=dict(color='#445', gridcolor='#0d0d1e'),
+                    font=dict(color='#445', size=9),
+                )
+                st.plotly_chart(fig_nov, use_container_width=True, key='novelty_chart')
+            else:
+                st.info("No novelty data yet.")
+
+        # ── Cambrian Events + Top Breakthroughs ──────────────────────────────
+        with mm4:
+            st.markdown("<div class='section-title'>Cambrian Explosion Events</div>",
+                        unsafe_allow_html=True)
+            cambrian = EN.phylo.cambrian_events
+            if cambrian:
+                for evt in reversed(cambrian[-8:]):
+                    st.markdown(
+                        f"<div class='event-line' style='color:#FF8C00'>"
+                        f"🌋 Tick {evt['step']} — novelty burst ×{evt['ratio']} "
+                        f"({evt['n_clades']} clades)</div>",
+                        unsafe_allow_html=True
+                    )
+            else:
+                st.caption("No Cambrian events yet. Run more ticks!")
+
+            st.divider()
+            st.markdown("<div class='section-title'>Top Breakthroughs (Gödel Programs)</div>",
+                        unsafe_allow_html=True)
+            for bt in reversed(C.novelty_scorer.breakthroughs[-10:]):
+                prog_str = " → ".join(bt.get('program', []))
+                st.markdown(
+                    f"<div class='event-line'>"
+                    f"<span style='color:#00FF88'>⭐ G:{bt['godel']}</span>"
+                    f" <span style='color:#334'>novelty:{bt['novelty']:.3f} | {prog_str}</span>"
+                    f"</div>",
+                    unsafe_allow_html=True
+                )
+
+        st.divider()
+        # ── Clade history sparkline ───────────────────────────────────────────
+        clade_h = phylo_stats.get('clade_history', [])
+        if len(clade_h) > 3:
+            fig_ch = go.Figure(go.Scatter(
+                y=clade_h, mode='lines',
+                line=dict(color='#9370DB', width=1.5),
+                fill='tozeroy', fillcolor='rgba(147,112,219,0.08)',
+            ))
+            fig_ch.update_layout(
+                paper_bgcolor='#04040e', plot_bgcolor='#04040e',
+                height=120, margin=dict(l=30,r=10,t=30,b=10),
+                title=dict(text='Cognitive Clade Count Over Time',
+                           font=dict(color='#9370DB',size=11)),
+                xaxis=dict(color='#445', showgrid=False),
+                yaxis=dict(color='#445', gridcolor='#0d0d1e'),
+                font=dict(color='#445', size=9),
+            )
+            st.plotly_chart(fig_ch, use_container_width=True, key='clade_hist')
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 10  ─  KNOWLEDGE PHYSICS (NEW)
+# ══════════════════════════════════════════════════════════════════════════════
+with tabs[9]:
+    st.markdown(
+        "<div class='section-title'>🔬 Knowledge Physics · Ambient Intelligence Field</div>",
+        unsafe_allow_html=True
+    )
+
+    kp1, kp2 = st.columns(2)
+
+    # ── Knowledge Field Heatmap ───────────────────────────────────────────────
+    with kp1:
+        st.markdown("<div class='section-title'>Knowledge Field Heatmap (diffusing)</div>",
+                    unsafe_allow_html=True)
+        kf = W.knowledge_field_heatmap()
+        kf_flat = kf.flatten()
+        fig_kf = go.Figure(go.Heatmap(
+            z=kf.T,
+            colorscale=[
+                [0.0, '#04040e'], [0.3, '#0a1a2e'],
+                [0.6, '#0d3060'], [1.0, '#00FF88'],
+            ],
+            showscale=True,
+            hovertemplate='Knowledge Field<br>(%{x},%{y}) = %{z:.3f}<extra></extra>',
+        ))
+        if alive_agents:
+            fig_kf.add_trace(go.Scatter(
+                x=[a.x for a in alive_agents], y=[a.y for a in alive_agents],
+                mode='markers',
+                marker=dict(size=4, color='white', opacity=0.4),
+                hoverinfo='skip', showlegend=False,
+            ))
+        fig_kf.update_layout(
+            paper_bgcolor='#04040e', plot_bgcolor='#04040e',
+            height=380, margin=dict(l=0,r=0,t=10,b=0),
+            xaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+            yaxis=dict(showgrid=False, showticklabels=False, zeroline=False, scaleanchor='x'),
+        )
+        st.plotly_chart(fig_kf, use_container_width=True, key='kf_heatmap')
+
+        # Field stats
+        st.markdown(
+            f"<div class='kpi-card'>"
+            f"Mean intensity: <span style='color:#00FF88'>{kf_flat.mean():.4f}</span><br>"
+            f"Max hotspot: <span style='color:#7DF9FF'>{kf_flat.max():.4f}</span><br>"
+            f"Non-zero cells: <span style='color:#FFD700'>{(kf_flat > 0.01).sum()}</span>"
+            f" / {len(kf_flat)}<br>"
+            f"Total artifacts: <span style='color:#DDA0DD'>{len(W.artifacts)}</span>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+
+    # ── Global Memory + Tribal Memories ──────────────────────────────────────
+    with kp2:
+        st.markdown("<div class='section-title'>Global Memory Matrix (spectral imprint)</div>",
+                    unsafe_allow_html=True)
+        gm_spec = W.global_memory.spectral_summary()
+        if gm_spec.any():
+            fig_gm = go.Figure(go.Bar(
+                y=gm_spec.tolist(),
+                marker=dict(color='#7DF9FF', line=dict(width=0)),
+            ))
+            fig_gm.update_layout(
+                paper_bgcolor='#04040e', plot_bgcolor='#04040e',
+                height=200, margin=dict(l=30,r=10,t=30,b=10),
+                title=dict(
+                    text=f'Global Memory Eigenvalues ({W.global_memory.count} imprints)',
+                    font=dict(color='#7DF9FF',size=11)
+                ),
+                xaxis=dict(color='#445'),
+                yaxis=dict(color='#445', gridcolor='#0d0d1e'),
+                font=dict(color='#445', size=9),
+            )
+            st.plotly_chart(fig_gm, use_container_width=True, key='gm_spec')
+        else:
+            st.info("No global memory yet.")
+
+        st.divider()
+        st.markdown("<div class='section-title'>Tribal Memory Matrices</div>",
+                    unsafe_allow_html=True)
+        for tid, tribe in list(C.tribes.items())[:6]:
+            if tribe.tribal_memory and tribe.tribal_memory.count > 0:
+                tm_spec = tribe.tribal_memory.spectral_summary()
+                st.markdown(
+                    f"<div class='kpi-card'>"
+                    f"<span style='color:{tribe.color or \"#7DF9FF\"}'>{tid}</span>"
+                    f" — {tribe.tribal_memory.count} imprints"
+                    f" — max eigenval: {tm_spec.max():.3f}"
+                    f"</div>",
+                    unsafe_allow_html=True
+                )
+
+    st.divider()
+    kp3, kp4 = st.columns(2)
+
+    # ── Agent Meta-Eigenspread Distribution ──────────────────────────────────
+    with kp3:
+        st.markdown("<div class='section-title'>Agent Meta-Eigenspread Distribution</div>",
+                    unsafe_allow_html=True)
+        if alive_agents:
+            eigenspreads = [
+                a.meta.eigenspread() for a in alive_agents
+                if hasattr(a, 'meta') and a.meta is not None
+            ]
+            avg_es = float(np.mean(eigenspreads)) if eigenspreads else 0.0
+            st.metric("Avg Cognitive Diversity", f"{avg_es:.4f}")
+            fig_es = go.Figure(go.Histogram(
+                x=eigenspreads, nbinsx=25,
+                marker=dict(color='#FF8C00', line=dict(color='#04040e', width=0.5)),
+            ))
+            fig_es.update_layout(
+                paper_bgcolor='#04040e', plot_bgcolor='#04040e',
+                height=220, margin=dict(l=30,r=10,t=30,b=10),
+                title=dict(text='Cognitive Diversity (meta-H eigenspread)',
+                           font=dict(color='#FF8C00',size=11)),
+                xaxis=dict(title='Eigenspread', color='#445', gridcolor='#0d0d1e'),
+                yaxis=dict(title='Count', color='#445', gridcolor='#0d0d1e'),
+                font=dict(color='#445', size=9),
+            )
+            st.plotly_chart(fig_es, use_container_width=True, key='eigenspread_hist')
+
+    # ── Idea Interference / Artifact Map ─────────────────────────────────────
+    with kp4:
+        st.markdown("<div class='section-title'>Artifact Interference Map</div>",
+                    unsafe_allow_html=True)
+        art_types_all = [v.get('type', 'unknown') for v in W.artifacts.values()]
+        if art_types_all:
+            at_u = list(set(art_types_all))
+            at_c = [art_types_all.count(t) for t in at_u]
+            fig_art2 = go.Figure(go.Pie(
+                labels=at_u, values=at_c, hole=0.45,
+                marker=dict(colors=[TECH_COLOR.get(t,'#888') for t in at_u]),
+                textfont=dict(size=9, color='#eee'),
+            ))
+            fig_art2.update_layout(
+                paper_bgcolor='#04040e', height=240,
+                margin=dict(l=0,r=0,t=20,b=0),
+                title=dict(text=f'Artifacts by type ({len(W.artifacts)} total)',
+                           font=dict(color='#FFD700',size=10), x=0.5),
+                font=dict(color='#556', size=9),
+                legend=dict(font=dict(size=8, color='#556')),
+            )
+            st.plotly_chart(fig_art2, use_container_width=True, key='art_pie2')
+        else:
+            st.info("No artifacts placed yet.")
+
+        # Recent artifacts with Gödel info
+        st.markdown("<div class='section-title'>Recent Artifacts (Gödel)</div>",
+                    unsafe_allow_html=True)
+        recent_arts = list(W.artifacts.items())[-12:]
+        for (ax, ay), art in reversed(recent_arts):
+            atype  = art.get('type', '?')
+            acolor = TECH_COLOR.get(atype, '#888')
+            aname  = art.get('name', '?')
+            cre    = art.get('creator', '?')[:6]
+            godel  = art.get('godel', '')
+            prog   = " → ".join(art.get('program', [])) if 'program' in art else ''
+            st.markdown(
+                f"<div class='event-line'>"
+                f"<span style='color:{acolor}'>{TECH_ICON.get(atype,'?')} <b>{aname}</b></span>"
+                f" <span style='color:#334'>by {cre} G:{godel}</span><br>"
+                f"<span style='color:#556'>{prog}</span>"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # FOOTER
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1363,10 +1742,9 @@ st.divider()
 st.markdown(
     "<div style='text-align:center;font-family:monospace;font-size:10px;"
     "color:#151530;padding:8px'>"
-    "EVENT HORIZON · Spectral Life Framework · "
-    "Invented by Devanik &amp; Claude (Xylia) · 2025<br>"
-    "Brain: Harmonic Resonance Consciousness (HRC) · ψ ∈ ℂᴷ · H Hermitian "
-    "· Schrödinger evolution · Born-rule decisions · Riemannian learning · Zero prior art"
+    "EVENT HORIZON v2.0 · HyperAgent Edition · K_DIM=32 · 96 Agents<br>"
+    "Metacognitive Self-Modification · Gödel-Encoded Inventions · Zero LLM<br>"
+    "Invented by Devanik &amp; Claude (Xylia) · 2025"
     "</div>",
     unsafe_allow_html=True
 )
