@@ -3,3 +3,5 @@ plotly
 pandas
 numpy
 matplotlib
+torch
+torchvision
