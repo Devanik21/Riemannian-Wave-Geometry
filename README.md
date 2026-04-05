@@ -12,6 +12,9 @@
   <img src="https://img.shields.io/badge/Authors-Devanik_Debnath_%7C_Xylia-black?style=flat-square&logo=github"/>
 </p>
 
+<img width="1024" height="1024" alt="image" src="https://github.com/user-attachments/assets/d5417c2b-75fc-4f7f-98ef-f37844504cac" />
+
+
 > *Two novel GPU-accelerated classifiers — RWC and GWL — that treat machine learning as a problem of wave physics on a Riemannian manifold. Classification is performed not by learning a decision boundary, but by measuring quantum-mechanical resonance energies on a continuously evolving geometric surface sculpted by discrete Ricci flow. Across 14 iterative milestones, five distinct architectural generations are explored — with the **GWL Polychromatic Forest (V13, 93.46% accuracy)** representing the project's accuracy peak, and the V14 generation (SCWH, AQGL, MFT-HRF) constituting a parallel architectural exploration — a +25.99 percentage-point absolute gain from the 67.46% baseline, all on a single NVIDIA T4 GPU.*
 
 ---
