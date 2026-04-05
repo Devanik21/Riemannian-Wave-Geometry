@@ -480,7 +480,8 @@ class BioHyperAgent:
 
         # Deposit "resource found" meme
         if eaten > 0.5:
-            world.deposit_meme(self.x, self.y, 1, 0.3)
+            world.deposit_meme(self.x, self.y, 1, 0.3, tradition_id=hash(self.tribe_id or self.id))
+
 
         return gain + 0.02
 
@@ -509,7 +510,8 @@ class BioHyperAgent:
         target.social_memory[self.id] = target.social_memory.get(self.id, 0) - 1.0
 
         # Deposit danger meme
-        world.deposit_meme(self.x, self.y, 0, 0.5)
+        world.deposit_meme(self.x, self.y, 0, 0.5, tradition_id=hash(self.tribe_id or self.id))
+
 
         if target.health <= 0:
             target.alive = False
@@ -653,7 +655,8 @@ class BioHyperAgent:
         partner.brain.emotions[E.AFFECTION] = min(1.0, partner.brain.emotions[E.AFFECTION] + 0.40)
 
         # Deposit sacred meme at birth site
-        world.deposit_meme(cx, cy, 2, 0.4)
+        world.deposit_meme(cx, cy, 2, 0.4, tradition_id=hash(self.tribe_id or self.id))
+
 
         return coupling * 0.85 + 0.20, child
 
@@ -678,7 +681,8 @@ class BioHyperAgent:
         })
         world.boost_knowledge_field(self.x, self.y, 1.5)
         # Deposit sacred meme at invention site
-        world.deposit_meme(self.x, self.y, 2, 0.5)
+        world.deposit_meme(self.x, self.y, 2, 0.5, tradition_id=hash(self.tribe_id or self.id))
+
         self.brain.emotions[E.WONDER] = min(1.0, self.brain.emotions[E.WONDER] + 0.50)
         return 1.45
 

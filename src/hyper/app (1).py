@@ -20,6 +20,8 @@ from plotly.subplots import make_subplots
 import numpy as np
 import pandas as pd
 import time
+import scipy.ndimage as nd
+
 
 # ── Page must be very first Streamlit call ────────────────────────────────────
 st.set_page_config(
@@ -35,10 +37,11 @@ st.set_page_config(
 st.markdown("""
 <style>
 html, body, [class*="css"], .stApp, .main .block-container {
-    background-color: #04040e !important;
+    background-color: #05070a !important;
     color: #c4c4d4 !important;
     font-family: 'JetBrains Mono', 'Courier New', monospace;
 }
+
 h1 { color: #7DF9FF !important; letter-spacing: 2px; }
 h2 { color: #9DECFF !important; }
 h3 { color: #aef !important; font-size: 1em !important; letter-spacing: 1px; }
@@ -101,10 +104,12 @@ hr { border-color: #1a1a3a !important; }
     margin: 1px 0; font-family: monospace; font-size: 10px;
 }
 .section-title {
-    color: #7DF9FF; font-size: 0.82em; letter-spacing: 2px;
+    color: #7DF9FF; font-size: 0.85em; letter-spacing: 2.5px;
     text-transform: uppercase; border-bottom: 1px solid #1a1a3a;
-    padding-bottom: 4px; margin-bottom: 8px;
+    padding-bottom: 6px; margin-bottom: 10px;
+    font-weight: bold;
 }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -1820,34 +1825,56 @@ elif st.session_state.active_tab == "🧬 v3.0 EMERGENCE":
     mg_col, ph_col = st.columns(2)
 
     with mg_col:
-        st.markdown("<div class='section-title'>🎨 Meme Grid (Stigmergy) · Cultural Memory Field</div>",
+        st.markdown("<div class='section-title'>🎨 MEME GRID (STIGMERGY) · CULTURAL MEMORY FIELD</div>",
                     unsafe_allow_html=True)
 
         meme_ch_sel = st.radio(
-            "Channel", ["Danger (red)", "Resource (green)", "Sacred (violet)", "Composite RGB"],
-            horizontal=True, key='meme_ch_sel'
+            "Signal Channel", ["Danger (red)", "Resource (green)", "Sacred (violet)", "Composite RGB"],
+            horizontal=True, index=3, key='meme_ch_sel'
         )
+
         meme = W.meme_grid  # (size, size, 3)
 
         if meme_ch_sel == "Composite RGB":
-            # ── GE-NESIS STYLE ADDITIVE RGB MIXING ────────────────────────────
+            # ── SPECTRAL ADDITIVE BLENDING (30+ Colors) ───────────────────────
             mg_img = np.zeros((W.size, W.size, 3), dtype=np.float32)
-            # R=Danger, G=Resource, B=Sacred + additive bleeds for vibrancy
-            mg_img[:, :, 0] = meme[:, :, 0] + 0.2 * meme[:, :, 2] # Danger + Sacred bleed
-            mg_img[:, :, 1] = meme[:, :, 1] + 0.1 * meme[:, :, 0] # Resource + Danger bleed
-            mg_img[:, :, 2] = meme[:, :, 2] + 0.3 * meme[:, :, 1] # Sacred + Resource bleed
+            mh = getattr(W, 'meme_hue_grid', np.zeros_like(meme[:,:,0]))
+            
+            # Channel Base Colors: Danger(Red), Resource(Green), Sacred(Violet)
+            mg_img[:, :, 0] += meme[:, :, 0]   # R
+            mg_img[:, :, 1] += meme[:, :, 1]   # G
+            mg_img[:, :, 2] += meme[:, :, 2] * 0.8  # B-ish
+            mg_img[:, :, 0] += meme[:, :, 2] * 0.5  # V-ish (R+B)
+            
+            # Tradition Spectral Richness (The 30+ colors)
+            for i in range(3):
+                # Map hue to RGB components manually for speed
+                h_rad = (mh / 360.0) * 2 * np.pi
+                spectral_r = 0.5 + 0.5 * np.cos(h_rad)
+                spectral_g = 0.5 + 0.5 * np.cos(h_rad - 2*np.pi/3)
+                spectral_b = 0.5 + 0.5 * np.cos(h_rad - 4*np.pi/3)
+                
+                # Overlay spectral color weighted by total meme intensity
+                intensity = np.max(meme, axis=2)
+                mg_img[:, :, 0] += intensity * spectral_r * 0.3
+                mg_img[:, :, 1] += intensity * spectral_g * 0.3
+                mg_img[:, :, 2] += intensity * spectral_b * 0.3
+
+            # --- ATMOSPHERIC GLOW (Bloom) ---
+            # Apply slight blur to create the "Aura" effect
+            for i in range(3):
+                mg_img[:, :, i] = nd.gaussian_filter(mg_img[:, :, i], sigma=0.6)
 
             max_v = mg_img.max()
-            if max_v > 1e-9:
-                mg_img /= max_v
-                
-            # Nonlinear power curve: pulls faint trails out of the void
-            # 0.4 power = intense boost to low-intensity signals
-            mg_img = np.power(mg_img, 0.40)
+            if max_v > 1e-9: mg_img /= max_v
+            
+            # Boost vibrancy in dark areas
+            mg_img = np.power(mg_img, 0.45) 
             
             fig_meme = go.Figure(go.Image(
                 z=(np.clip(mg_img.transpose(1, 0, 2), 0, 1) * 255).astype(np.uint8),
             ))
+
 
         else:
             ch_map = {"Danger (red)": 0, "Resource (green)": 1, "Sacred (violet)": 2}

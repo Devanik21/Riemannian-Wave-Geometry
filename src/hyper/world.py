@@ -228,6 +228,8 @@ class World:
         #   Channel 0 = Danger, Channel 1 = Resource, Channel 2 = Sacred
         # ══════════════════════════════════════════════════════════════════
         self.meme_grid = np.zeros((size, size, 3), dtype=np.float32)
+        self.meme_hue_grid = np.zeros((size, size), dtype=np.float32)
+
 
         # ══════════════════════════════════════════════════════════════════
         # NEW v3.0: Seasonal Dynamics
@@ -442,11 +444,18 @@ class World:
         return self.meme_grid[x % self.size, y % self.size].copy()
 
     def deposit_meme(self, x: int, y: int, channel: int,
-                     value: float) -> None:
+                     value: float, tradition_id: int = None) -> None:
         bx, by = x % self.size, y % self.size
         self.meme_grid[bx, by, channel] = min(
             1.0, self.meme_grid[bx, by, channel] + value
         )
+        # Update hue using Golden Ratio distribution for 30+ vibrant colors
+        if tradition_id is not None:
+             hue = (tradition_id * 137.508) % 360
+             # Blend current hue with new hue based on intensity
+             old_hue = self.meme_hue_grid[bx, by]
+             self.meme_hue_grid[bx, by] = (old_hue * 0.7 + hue * 0.3) if old_hue > 0 else hue
+
 
     def _diffuse_meme_grid(self) -> None:
         """Meme diffusion: 9-cell average + slow decay."""
@@ -458,7 +467,14 @@ class World:
         new_mg /= 9.0
         self.meme_grid = 0.60 * new_mg + 0.40 * mg
         self.meme_grid *= 0.99  # 1% decay per diffusion step
+        
+        # Diffuse hue grid
+        nh = self.meme_hue_grid
+        dh = (nh + np.roll(nh, 1, 0) + np.roll(nh, -1, 0) + np.roll(nh, 1, 1) + np.roll(nh, -1, 1)) / 5.0
+        self.meme_hue_grid = 0.8 * dh + 0.2 * self.meme_hue_grid
+        
         np.clip(self.meme_grid, 0.0, 1.0, out=self.meme_grid)
+
 
     # ══════════════════════════════════════════════════════════════════════════
     # NEW v3.0: SOCIAL BOND REGISTRY + METABOLIC OSMOSIS
