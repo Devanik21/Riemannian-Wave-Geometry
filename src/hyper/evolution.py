@@ -1,25 +1,26 @@
 """
-evolution.py — Population Lifecycle Engine v2.0
+evolution.py — Population Lifecycle Engine v3.0
 ================================================
 Manages the full lifecycle with METACOGNITIVE SELECTION PRESSURE.
 
-Changes from v1.07:
-  - INITIAL_POP: 72 (max 128) for Streamlit performance
-  - Meta-fitness selection: immigrants weighted by metacognitive potential
-  - PhylogeneticTracker: cognitive clade tracking + Cambrian explosions
-  - Novelty-rate telemetry: tracks per-generation discovery acceleration
-  - Population statistics include meta-cognitive metrics
+NEW in v3.0 (ported from GeNeSIS):
+  - Cultural Ratchet Verification: behavioral autocorrelation across generations
+  - Behavioral Clustering: KMeans-style eigenvalue archetype assignment
+  - DNA Preservation: full simulation state export for replay
+  - Adaptive population dynamics with N-tick staggered execution
 
 Invented by Devanik & Claude (Xylia) — Event Horizon Project
 """
 
 import numpy as np
+import json
+import datetime
 from typing import Dict, List, Tuple, Optional
 
 from agents import BioHyperAgent
 from world import World
 from civilization import CivilizationManager
-from metacognition import PhylogeneticTracker, K_META
+from metacognition import PhylogeneticTracker, K_META, K_DIM
 
 
 class EvolutionEngine:
@@ -63,6 +64,20 @@ class EvolutionEngine:
         # Meta-fitness ranking (for selection pressure during immigration)
         self._meta_fitness_cache : Dict[str, float] = {}
 
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: Cultural Ratchet — behavioral autocorrelation tracking
+        # ══════════════════════════════════════════════════════════════════
+        self.gen_behavior_archive : Dict[int, np.ndarray] = {}
+        self.tradition_verified   : bool  = False
+        self.cultural_continuity  : float = 0.0
+
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: Behavioral Archetypes (KMeans-style clustering)
+        # ══════════════════════════════════════════════════════════════════
+        self.archetypes        : Dict[str, str] = {}  # agent_id → archetype
+        self.archetype_labels  = ['Explorer', 'Builder', 'Fighter', 'Thinker']
+        self.archetype_counts  : Dict[str, int] = {}
+
     # ── Seeding ──────────────────────────────────────────────────────────────
 
     def initialize(self) -> Dict[str, BioHyperAgent]:
@@ -79,7 +94,7 @@ class EvolutionEngine:
                 seed=self.seed + i * 41 + 7,
                 generation=0,
             )
-            a.energy = self.rng.uniform(2.5, 6.5)
+            a.energy = self.rng.uniform(7.5, 10.0) # Prevent early death
             agents[a.id] = a
             self.lineage[a.id] = []
 
@@ -153,8 +168,8 @@ class EvolutionEngine:
                 self.total_born           += 1
                 events.append(f"🌍 Immigrant: {immigrant.id}")
 
-        # World and civilisation tick
-        world.step()
+        # World and civilisation tick (pass agents dict for new features)
+        world.step(agents=self.agents)
         civ.update(self.agents, world.step_count)
 
         # Phylogenetic tracking (every 10 ticks for performance)
@@ -175,6 +190,14 @@ class EvolutionEngine:
         # Update meta-fitness cache (every 25 ticks)
         if world.step_count % 25 == 0:
             self._update_meta_fitness()
+
+        # Cultural ratchet verification (every 50 ticks)
+        if world.step_count % 50 == 0:
+            self._check_cultural_ratchet()
+
+        # Behavioral clustering (every 15 ticks)
+        if world.step_count % 15 == 0:
+            self._behavioral_clustering()
 
         # Stats bookkeeping
         alive_now = [a for a in self.agents.values() if a.alive]
@@ -222,6 +245,118 @@ class EvolutionEngine:
             fitness = discovery_rate * eigenspread * (1 + meta_invs * 0.5)
             self._meta_fitness_cache[a.id] = max(0.01, fitness)
 
+    # ══════════════════════════════════════════════════════════════════════════
+    # NEW v3.0: CULTURAL RATCHET VERIFICATION
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def _check_cultural_ratchet(self):
+        """
+        Cultural Ratchet: verify that behavioral patterns persist across
+        generations — autocorrelation between gen N and gen N+5.
+        """
+        alive = [a for a in self.agents.values() if a.alive]
+        if not alive:
+            return
+
+        # Compute average psi amplitude profile for current generation
+        gen = self.generation
+        profiles = [np.abs(a.brain.psi) for a in alive]
+        avg_profile = np.mean(profiles, axis=0)
+        self.gen_behavior_archive[gen] = avg_profile
+
+        # Clean old entries
+        if len(self.gen_behavior_archive) > 30:
+            oldest = min(self.gen_behavior_archive.keys())
+            del self.gen_behavior_archive[oldest]
+
+        # Check autocorrelation at lag=5 generations
+        gen_keys = sorted(self.gen_behavior_archive.keys())
+        if len(gen_keys) < 5:
+            return
+
+        current = self.gen_behavior_archive[gen_keys[-1]]
+        lagged  = self.gen_behavior_archive[gen_keys[-5]]
+
+        if np.std(current) > 1e-9 and np.std(lagged) > 1e-9:
+            corr = float(np.corrcoef(current, lagged)[0, 1])
+            self.cultural_continuity = corr if np.isfinite(corr) else 0.0
+            self.tradition_verified = corr > 0.7
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # NEW v3.0: BEHAVIORAL CLUSTERING (KMeans-style archetype assignment)
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def _behavioral_clustering(self):
+        """
+        Cluster agents by eigenvalue fingerprints into 4 archetypes.
+        Uses simplified KMeans: assign to nearest centroid.
+        """
+        alive = [a for a in self.agents.values() if a.alive]
+        if len(alive) < 8:
+            return
+
+        # Extract eigenvalue fingerprints (first 4 eigenvalues)
+        fingerprints = np.array([
+            a.brain._evals[:4].real for a in alive
+        ])
+
+        # Simple k=4 clustering: use quartiles of first eigenvalue
+        sorted_indices = np.argsort(fingerprints[:, 0])
+        n = len(alive)
+        quarter = max(1, n // 4)
+
+        self.archetypes = {}
+        self.archetype_counts = {label: 0 for label in self.archetype_labels}
+
+        for i, agent in enumerate(alive):
+            rank = np.searchsorted(sorted_indices, i)
+            archetype_idx = min(3, rank // quarter)
+            label = self.archetype_labels[archetype_idx]
+            self.archetypes[agent.id] = label
+            self.archetype_counts[label] = self.archetype_counts.get(label, 0) + 1
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # NEW v3.0: DNA PRESERVATION EXPORT
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def export_simulation_dna(self, civ: CivilizationManager = None,
+                               world: World = None) -> dict:
+        """
+        Export complete simulation state for replay / Nobel Committee showcase.
+        Serializes all metrics, agent snapshots, and world state.
+        """
+        alive = [a for a in self.agents.values() if a.alive]
+
+        dna = {
+            'timestamp'      : datetime.datetime.now().isoformat(),
+            'version'        : 'v3.0',
+            'total_born'     : self.total_born,
+            'total_died'     : self.total_died,
+            'generation'     : self.generation,
+            'pop_history'    : self.pop_history[-300:],
+            'energy_history' : self.energy_history[-300:],
+            'inv_history'    : self.inv_history[-300:],
+            'meta_inv_history': self.meta_inv_history[-300:],
+            'novelty_history': self.novelty_history[-300:],
+            'cultural_continuity': self.cultural_continuity,
+            'tradition_verified': self.tradition_verified,
+            'archetype_counts': self.archetype_counts,
+            'n_clades'       : len(self.phylo.clades),
+            'n_cambrian'     : len(self.phylo.cambrian_events),
+            'agent_snapshots': [a.to_dict() for a in alive[:50]],
+        }
+
+        if civ:
+            dna['civ_stats'] = civ.get_stats()
+            dna['tech_tree_size'] = len(civ.tech.nodes)
+            dna['tribe_count'] = len(civ.tribes)
+            dna['breakthroughs'] = len(civ.novelty_scorer.breakthroughs)
+
+        if world:
+            dna['world_stats'] = world.get_stats()
+
+        return dna
+
     # ── Utilities ────────────────────────────────────────────────────────────
 
     def _spawn_immigrant(self) -> BioHyperAgent:
@@ -239,7 +374,7 @@ class EvolutionEngine:
             x=x, y=y, world_size=self.world_size,
             seed=self.rng.randint(0, 2**31),
         )
-        a.energy = 3.0
+        a.energy = 8.0
 
         # Meta-fitness weighted inheritance: copy meta-H from the fittest
         if self._meta_fitness_cache:
@@ -302,7 +437,7 @@ class EvolutionEngine:
             'pop_history'     : self.pop_history[-150:],
             'energy_history'  : self.energy_history[-150:],
             'inv_history'     : self.inv_history[-150:],
-            # New meta stats
+            # Meta stats
             'total_meta_inv'  : meta_invs,
             'avg_eigenspread' : round(avg_eigenspread, 4),
             'total_composed'  : composed,
@@ -310,6 +445,10 @@ class EvolutionEngine:
             'n_cambrian'      : len(self.phylo.cambrian_events),
             'meta_inv_history': self.meta_inv_history[-150:],
             'novelty_history' : self.novelty_history[-150:],
+            # NEW v3.0 stats
+            'cultural_continuity': round(self.cultural_continuity, 4),
+            'tradition_verified' : self.tradition_verified,
+            'archetype_counts'   : self.archetype_counts,
         }
 
     def top_agents(self, key: str = 'energy', n: int = 10) -> List[dict]:

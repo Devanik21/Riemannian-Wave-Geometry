@@ -239,7 +239,7 @@ class MetaConsciousness:
           3. Measure cognitive surprise (change in meta_psi after mutation)
           4. Return meta-invention descriptor
         """
-        if wonder < 0.7 or curiosity < 0.6 or age < 100:
+        if wonder < 0.50 or curiosity < 0.40 or age < 50:
             return None
 
         # Save pre-mutation state for surprise measurement

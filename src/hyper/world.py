@@ -1,326 +1,714 @@
 """
-world.py — Physical Environment v2.0
-======================================
-The world the BioHyperAgents inhabit — now with Knowledge Physics.
+world.py — Hyper-Horizon World Physics v3.0
+=============================================
+The physical substrate in which BioHyperAgents live, die, and evolve.
 
-Resources: food, energy_crystal, knowledge_ore, rare_element
-  — distributed via multi-cluster Gaussian noise
-  — regenerate slowly; scarce locally after consumption
-  — periodic world events (abundance shocks, scarcity zones, anomalies)
+Resources   : 4 species on a toroidal grid (R_FOOD, R_MINERAL, R_KNOWLEDGE, R_RARE)
+Knowledge   : Diffusing 'idea field' — inspiration gradient
+Artifacts   : Physical relics of agent invention
+Events      : Stochastic world perturbations
 
-Knowledge Field: diffusing scalar field representing "ambient intelligence"
-  — agents boost it when they invent
-  — diffuses each tick (Gaussian blur)
-  — high-field areas boost meta-invention probability
-
-Artifacts: persistent knowledge objects left by agents
-  — any agent can absorb another agent's artifacts
-  — legacy artifacts persist after death
-
-Global Civilization Memory: autoassociative matrix for world knowledge
-  — stores all breakthrough inventions
-  — agents can query it for resonance retrieval
-
-Spatial index: grid-based O(1) agent lookup.
+NEW in v3.0 (ported from GeNeSIS / Thermodynamic-Mind):
+  PhysicsOracle  : Frozen PyTorch NN — agents reverse-engineer reality
+  Pheromones     : 8-channel diffusing chemical signal grid (stigmergy)
+  Meme Grid      : 3-channel stigmergic cultural memory (Danger/Resource/Sacred)
+  Seasons        : Summer/Winter cycle with resource modulation
+  Social Bonds   : Persistent frozenset pairs with metabolic osmosis
+  Structures     : Trap, Battery, Cultivator — functional world objects
+  Weather Control: Collective agent votes modulate season intensity
+  Adaptive Spawn : Resource spawn rate inversely proportional to population
+  MegaResource   : Cooperative-harvest resource requiring multiple agents
 
 Invented by Devanik & Claude (Xylia) — Event Horizon Project
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Tuple
+import torch
+import torch.nn as nn
+from typing import Dict, List, Tuple, Optional, Set
 
-from metacognition import K_DIM, CivilizationMemory
-
-# ── Resource types ───────────────────────────────────────────────────────────
+# ── Resource types ──────────────────────────────────────────────────────────
 N_RESOURCES  = 4
 R_FOOD       = 0
-R_ENERGY     = 1
+R_MINERAL    = 1
 R_KNOWLEDGE  = 2
 R_RARE       = 3
-R_NAMES      = ['Food', 'Energy Crystal', 'Knowledge Ore', 'Rare Element']
 
+# ════════════════════════════════════════════════════════════════════════════
+# NEW v3.0: PHYSICS ORACLE — THE BLACK BOX OF REALITY
+# ════════════════════════════════════════════════════════════════════════════
+
+class PhysicsOracle(nn.Module):
+    """
+    A frozen neural network that defines the 'laws of physics' for the world.
+    Weights are fixed at initialisation (orthogonal init, fixed seed).
+    Agents must learn to reverse-engineer this oracle.
+
+    Input:  (21D agent_vector, 16D local_signal) = 37D
+    Output: (energy_flux, dx_bias, dy_bias, transmute_factor, drain_factor) = 5D
+    """
+    def __init__(self, seed: int = 314159):
+        super().__init__()
+        torch.manual_seed(seed)
+        self.layers = nn.Sequential(
+            nn.Linear(37, 64),
+            nn.Tanh(),
+            nn.Linear(64, 64),
+            nn.SiLU(),
+            nn.Linear(64, 5),
+        )
+        # Orthogonal init for maximum information preservation
+        for m in self.layers.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.orthogonal_(m.weight, gain=1.5)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0.0)
+        # Specific bias tweaks
+        with torch.no_grad():
+            self.layers[-1].bias[0] = 0.0   # energy_flux neutral
+            self.layers[-1].bias[4] = -0.3  # drain slightly negative
+
+        # FREEZE all parameters
+        for p in self.parameters():
+            p.requires_grad = False
+        self.eval()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.layers(x)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# NEW v3.0: STRUCTURE CLASSES (ported from GeNeSIS)
+# ════════════════════════════════════════════════════════════════════════════
+
+class Structure:
+    """Agent-built persistent world object that modifies the environment."""
+    def __init__(self, x: int, y: int, struct_type: str, builder_id: str):
+        self.x           = x
+        self.y           = y
+        self.struct_type = struct_type
+        self.builder_id  = builder_id
+        self.age         = 0
+        self.durability  = 100.0
+        self.created_tick= 0
+
+    def decay(self, rate: float = 0.05) -> bool:
+        """Returns True if still standing."""
+        self.age += 1
+        self.durability -= rate
+        return self.durability > 0
+
+
+class Trap(Structure):
+    """Harvests energy from non-builder agents passing through."""
+    def __init__(self, x: int, y: int, builder_id: str,
+                 harvest_rate: float = 0.2):
+        super().__init__(x, y, "trap", builder_id)
+        self.harvest_rate  = min(0.5, harvest_rate)
+        self.stored_energy = 0.0
+
+    def harvest(self, agent_id: str, agent_energy: float) -> float:
+        """Harvest from non-builder. Returns energy taken."""
+        if agent_id == self.builder_id:
+            return 0.0
+        taken = agent_energy * self.harvest_rate
+        self.stored_energy += taken
+        return taken
+
+    def collect(self, agent_id: str) -> float:
+        """Builder collects stored energy."""
+        if agent_id == self.builder_id:
+            collected = self.stored_energy * 0.9
+            self.stored_energy *= 0.1
+            return collected
+        return 0.0
+
+
+class Battery(Structure):
+    """Stores energy for later retrieval by authorised agents."""
+    def __init__(self, x: int, y: int, builder_id: str,
+                 capacity: float = 500.0):
+        super().__init__(x, y, "battery", builder_id)
+        self.capacity     = capacity
+        self.stored_energy= 0.0
+        self.authorized   : Set[str] = {builder_id}
+
+    def deposit(self, amount: float) -> float:
+        """Deposit energy. Returns how much was accepted."""
+        space  = max(0.0, self.capacity - self.stored_energy)
+        actual = min(amount, space)
+        self.stored_energy += actual * 0.9  # 10% loss
+        return actual
+
+    def withdraw(self, agent_id: str) -> float:
+        """Authorised withdrawal."""
+        if agent_id in self.authorized:
+            amount = self.stored_energy * 0.9
+            self.stored_energy *= 0.1
+            return amount
+        return 0.0
+
+
+class Cultivator(Structure):
+    """Boosts resource spawn rate in surrounding tiles."""
+    def __init__(self, x: int, y: int, builder_id: str,
+                 boost_radius: int = 2, boost_strength: float = 0.3):
+        super().__init__(x, y, "cultivator", builder_id)
+        self.boost_radius   = boost_radius
+        self.boost_strength = boost_strength
+
+    def get_influenced_tiles(self, world_size: int) -> List[Tuple[int, int]]:
+        tiles = []
+        for dx in range(-self.boost_radius, self.boost_radius + 1):
+            for dy in range(-self.boost_radius, self.boost_radius + 1):
+                tiles.append(((self.x + dx) % world_size,
+                              (self.y + dy) % world_size))
+        return tiles
+
+
+class MegaResource:
+    """A high-value resource requiring cooperative harvest (multiple agents)."""
+    def __init__(self, x: int, y: int, value: float = 150.0,
+                 required_agents: int = 2):
+        self.x               = x
+        self.y               = y
+        self.value           = value
+        self.required_agents = required_agents
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# WORLD
+# ════════════════════════════════════════════════════════════════════════════
 
 class World:
     """
-    Toroidal 2-D environment with:
-      - Multi-cluster resource fields
-      - Knowledge field (diffusing ambient intelligence)
-      - Stochastic world events every ~50 ticks
-      - Persistent artifact map with idea interference
-      - Global CivilizationMemory
-      - Efficient agent spatial index
+    The physical substrate:
+      - Toroidal grid of resources, knowledge, pheromones, memes
+      - Oracle physics for genuine discovery pressure
+      - Structures (Trap, Battery, Cultivator)
+      - Seasonal and weather dynamics
+      - Bond registry with metabolic osmosis
+      - MegaResources for cooperative incentives
     """
 
+    SEASON_LENGTH = 50   # ticks per season
+
     def __init__(self, size: int = 60, seed: int = 42):
-        self.size        = size
-        self.rng         = np.random.RandomState(seed % (2**31))
-        self.step_count  = 0
+        self.size       = size
+        self.rng        = np.random.RandomState(seed % (2**31))
+        self.step_count = 0
 
-        # Resource field  [x, y, resource_type]
-        self.resources   = np.zeros((size, size, N_RESOURCES), dtype=np.float32)
+        # ── Core resource grid ────────────────────────────────────────────
+        self.resources = (
+            self.rng.exponential(0.5, (size, size, N_RESOURCES))
+            .astype(np.float32)
+        )
 
-        # Knowledge field [x, y] — diffusing ambient intelligence
+        # ── Knowledge field ───────────────────────────────────────────────
         self.knowledge_field = np.zeros((size, size), dtype=np.float32)
 
-        # Artifact map: (x, y) → dict
-        self.artifacts   : Dict[Tuple[int,int], dict] = {}
+        # ── Artifact storage ──────────────────────────────────────────────
+        self.artifacts: Dict[Tuple[int, int], dict] = {}
 
-        # World-level accumulated knowledge
-        self.world_knowledge : Dict[str, dict] = {}
+        # ── Spatial index ─────────────────────────────────────────────────
+        self._agent_grid: Dict[Tuple[int, int], list] = {}
 
-        # Global CivilizationMemory (autoassociative matrix)
-        self.global_memory = CivilizationMemory(dim=K_DIM, eta=0.04)
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: PhysicsOracle (frozen, deterministic)
+        # ══════════════════════════════════════════════════════════════════
+        self.oracle = PhysicsOracle(seed=seed)
 
-        # World event log
-        self.events : List[dict] = []
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: Pheromone Grid (8 chemical channels)
+        # ══════════════════════════════════════════════════════════════════
+        self.pheromone_grid = np.zeros((size, size, 8), dtype=np.float32)
 
-        # Agent spatial grid: (x, y) → list of agent objects
-        self._grid : Dict[Tuple[int,int], list] = {}
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: Meme Grid — Stigmergic Memory (3 channels)
+        #   Channel 0 = Danger, Channel 1 = Resource, Channel 2 = Sacred
+        # ══════════════════════════════════════════════════════════════════
+        self.meme_grid = np.zeros((size, size, 3), dtype=np.float32)
 
-        self._init_resources()
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: Seasonal Dynamics
+        # ══════════════════════════════════════════════════════════════════
+        self.season       : int   = 0      # 0=Summer, 1=Winter, ...
+        self.season_timer : int   = 0
+        self.env_phase    : float = 0.0    # Circadian phase for agents
+        self.weather_amplitude: float = 1.0
 
-    # ── Initialisation ───────────────────────────────────────────────────────
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: Social Bond Registry
+        # ══════════════════════════════════════════════════════════════════
+        self.bonds: Set[frozenset] = set()
 
-    def _init_resources(self):
-        """Gaussian cluster resource placement — rich pockets + background noise."""
-        for r in range(N_RESOURCES):
-            n_clusters = self.rng.randint(4, 10)
-            for _ in range(n_clusters):
-                cx   = self.rng.randint(5, self.size - 5)
-                cy   = self.rng.randint(5, self.size - 5)
-                rad  = self.rng.randint(4, 15)
-                inten = self.rng.uniform(1.0, 5.5)
-                for x in range(max(0, cx-rad), min(self.size, cx+rad)):
-                    for y in range(max(0, cy-rad), min(self.size, cy+rad)):
-                        d = np.sqrt((x-cx)**2 + (y-cy)**2)
-                        self.resources[x, y, r] += float(
-                            inten * np.exp(-d / (rad / 2.0))
-                        )
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: Structures (Trap, Battery, Cultivator)
+        # ══════════════════════════════════════════════════════════════════
+        self.structures    : Dict[Tuple[int, int], Structure] = {}
+        self.cultivator_map: Dict[Tuple[int, int], float]     = {}
 
-        # Background noise
-        self.resources += (self.rng.rand(self.size, self.size, N_RESOURCES)
-                           .astype(np.float32) * 1.5)
-        self.resources  = np.clip(self.resources, 0.0, 15.0)
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: MegaResources (cooperative harvest)
+        # ══════════════════════════════════════════════════════════════════
+        self.mega_resources: Dict[Tuple[int, int], MegaResource] = {}
 
-    # ── Spatial index ────────────────────────────────────────────────────────
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: Collective metrics
+        # ══════════════════════════════════════════════════════════════════
+        self.kuramoto_order_parameter: float = 0.0
+        self.population_count        : int   = 0
+
+    # ── Agent spatial index ──────────────────────────────────────────────────
 
     def register_agents(self, agents: list) -> None:
-        """Rebuild spatial grid from alive agents (called each tick)."""
-        self._grid = {}
+        """Rebuild the spatial grid index every tick."""
+        self._agent_grid = {}
         for a in agents:
-            if a.alive:
-                key = (int(a.x), int(a.y))
-                self._grid.setdefault(key, []).append(a)
+            key = (a.x % self.size, a.y % self.size)
+            self._agent_grid.setdefault(key, []).append(a)
+        self.population_count = len(agents)
 
-    def get_agents_near(self, x: int, y: int, radius: int = 5) -> list:
-        """Return all agents within Chebyshev radius (fast grid lookup)."""
+    def get_agents_near(self, x: int, y: int, radius: int = 3) -> list:
+        """Find agents within Manhattan radius (fast grid scan)."""
         result = []
-        r2 = radius * radius
         for dx in range(-radius, radius + 1):
             for dy in range(-radius, radius + 1):
-                if dx * dx + dy * dy <= r2:
-                    key = ((x + dx) % self.size, (y + dy) % self.size)
-                    result.extend(self._grid.get(key, []))
+                key = ((x + dx) % self.size, (y + dy) % self.size)
+                result.extend(self._agent_grid.get(key, []))
         return result
 
-    # ── Physics tick ─────────────────────────────────────────────────────────
+    # ── Main step ────────────────────────────────────────────────────────────
 
-    def step(self) -> None:
-        """World physics: regeneration + knowledge diffusion + events."""
+    def step(self, agents: dict = None) -> None:
+        """
+        One world tick (N-tick staggered execution for performance):
+          Every tick:  resource regen, pheromone diffusion
+          Every 3:     structure processing, cultivator spawn
+          Every 5:     weather control, meme grid diffusion
+          Every 50:    world events
+          Every 100:   MegaResource spawn
+        """
         self.step_count += 1
 
-        # Fast regeneration (exponential, capped) for an abundant world
-        regen = self.rng.exponential(0.025, self.resources.shape).astype(np.float32)
-        self.resources += regen
-        self.resources  = np.clip(self.resources, 0.0, 15.0)
+        # ── Seasonal update ───────────────────────────────────────────────
+        self.season_timer += 1
+        self.env_phase = (self.step_count / self.SEASON_LENGTH) * 2 * np.pi
+        if self.season_timer >= self.SEASON_LENGTH:
+            self.season += 1
+            self.season_timer = 0
+        is_winter = (self.season % 2 == 1)
 
-        # Knowledge field diffusion (simple 3×3 Gaussian blur + decay)
+        # ── Adaptive resource regeneration ────────────────────────────────
+        n_pop = len(agents) if agents else self.population_count
+        adaptive_rate = 1.0 + 10.0 * np.exp(-n_pop / 100.0) if n_pop > 0 else 1.0
+        season_mod = 0.6 if is_winter else 1.0
+        season_mod *= self.weather_amplitude
+
+        regen = self.rng.exponential(
+            0.025 * adaptive_rate * season_mod, self.resources.shape
+        ).astype(np.float32)
+        self.resources += regen
+        np.clip(self.resources, 0.0, 15.0, out=self.resources)
+
+        # ── Knowledge field diffusion (every tick) ────────────────────────
         self._diffuse_knowledge_field()
 
-        # Idea interference patterns
+        # ── Pheromone diffusion (every tick) ──────────────────────────────
+        self._diffuse_pheromones()
+
+        # ── Idea interference (every tick) ────────────────────────────────
         self._compute_interference()
 
-        # World events every ~50 ticks
+        # ── Meme grid diffusion (staggered: every 5) ─────────────────────
+        if self.step_count % 5 == 0:
+            self._diffuse_meme_grid()
+
+        # ── Structure processing (staggered: every 3) ────────────────────
+        if self.step_count % 3 == 0:
+            self.process_structures(agents)
+
+        # ── Metabolic osmosis for bonds (every tick) ──────────────────────
+        if agents:
+            self.metabolic_osmosis(agents)
+
+        # ── Weather control (staggered: every 5) ─────────────────────────
+        if self.step_count % 5 == 0 and agents:
+            self.update_weather_control(agents)
+
+        # ── World events (staggered: every 50) ───────────────────────────
         if self.step_count % 50 == 0:
             self._world_event()
 
-    def _diffuse_knowledge_field(self):
-        """
-        Gaussian diffusion of the knowledge field.
-        Each cell spreads to neighbors; global decay factor applied.
-        """
-        kf = self.knowledge_field
-        # Simple 3×3 averaging kernel (toroidal boundary)
-        new_kf = np.zeros_like(kf)
-        for dx in [-1, 0, 1]:
-            for dy in [-1, 0, 1]:
-                new_kf += np.roll(np.roll(kf, dx, axis=0), dy, axis=1)
-        new_kf /= 9.0
-        # Blend: 70% diffused + 30% original (preserves hotspots)
-        self.knowledge_field = 0.70 * new_kf + 0.30 * kf
-        # Slow decay
-        self.knowledge_field *= 0.995
-        self.knowledge_field = np.clip(self.knowledge_field, 0.0, 10.0)
+        # ── MegaResource spawn (staggered: every 100) ────────────────────
+        if self.step_count % 100 == 0:
+            self.spawn_mega_resource()
 
-    def _compute_interference(self):
-        """
-        When two artifacts of the same category are within radius 8,
-        they create constructive interference in the knowledge field.
-        Only re-computed every 10 ticks for performance.
-        """
-        if self.step_count % 10 != 0:
-            return
-
-        # Group artifacts by category
-        cat_positions: Dict[str, List[Tuple[int, int]]] = {}
-        for (x, y), art in self.artifacts.items():
-            cat = art.get('type', 'unknown')
-            cat_positions.setdefault(cat, []).append((x, y))
-
-        # For each category with 2+ artifacts, create interference
-        for cat, positions in cat_positions.items():
-            if len(positions) < 2:
-                continue
-            for i, (x1, y1) in enumerate(positions[:20]):
-                for x2, y2 in positions[i+1:20]:
-                    dx = min(abs(x1-x2), self.size - abs(x1-x2))
-                    dy = min(abs(y1-y2), self.size - abs(y1-y2))
-                    dist = np.sqrt(dx*dx + dy*dy)
-                    if dist < 8:
-                        # Constructive interference at midpoint
-                        mx = (x1 + x2) // 2 % self.size
-                        my = (y1 + y2) // 2 % self.size
-                        boost = 0.15 * np.exp(-dist / 4.0)
-                        self.knowledge_field[mx, my] += boost
-
-    def _world_event(self):
-        etype = self.rng.choice(
-            ['abundance', 'scarcity', 'anomaly', 'plague'],
-            p=[0.38, 0.30, 0.22, 0.10]
-        )
-        cx = self.rng.randint(8, self.size - 8)
-        cy = self.rng.randint(8, self.size - 8)
-        rad = self.rng.randint(5, 13)
-
-        xs = np.arange(max(0, cx-rad), min(self.size, cx+rad))
-        ys = np.arange(max(0, cy-rad), min(self.size, cy+rad))
-
-        if etype == 'abundance':
-            for x in xs:
-                for y in ys:
-                    self.resources[x, y] = np.clip(
-                        self.resources[x, y] * 2.5, 0, 15
+        # ── Cultivator-boosted spawn (staggered: every 3, offset) ────────
+        if self.step_count % 3 == 1:
+            for pos, boost in self.cultivator_map.items():
+                if self.rng.random() < boost * 0.1:
+                    r_type = self.rng.randint(0, N_RESOURCES)
+                    self.resources[pos[0], pos[1], r_type] = min(
+                        15.0, self.resources[pos[0], pos[1], r_type] + 3.0
                     )
-            desc = f"🌿 Abundance bloom at ({cx},{cy})"
 
-        elif etype == 'scarcity':
-            for x in xs:
-                for y in ys:
-                    self.resources[x, y] *= 0.40 # less punishing
-            desc = f"🌵 Scarcity event at ({cx},{cy})"
-
-        elif etype == 'anomaly':
-            r_type = self.rng.randint(0, N_RESOURCES)
-            for x in xs:
-                for y in ys:
-                    self.resources[x, y, r_type] = min(
-                        15.0, self.resources[x, y, r_type] + 8.0
-                    )
-            # Anomalies also boost knowledge field
-            for x in xs:
-                for y in ys:
-                    self.knowledge_field[x, y] += 0.8
-            desc = f"🌀 Anomaly ({R_NAMES[r_type]}) at ({cx},{cy})"
-
-        else:  # plague
-            for x in xs:
-                for y in ys:
-                    self.resources[x, y] *= 0.70 # less punishing
-            desc = f"☠️ Plague zone at ({cx},{cy})"
-
-        self.resources = np.clip(self.resources, 0.0, 15.0)
-        evt = {'step': self.step_count, 'type': etype, 'desc': desc,
-               'pos': (cx, cy)}
-        self.events.append(evt)
-        if len(self.events) > 40:
-            self.events.pop(0)
+        # ── Kuramoto order parameter (staggered: every 10) ───────────────
+        if self.step_count % 10 == 0 and agents:
+            self._compute_kuramoto_order(agents)
 
     # ── Resource access ──────────────────────────────────────────────────────
 
-    def consume_resource(self, x: int, y: int, r_type: int,
-                         amount: float) -> float:
-        x, y     = x % self.size, y % self.size
-        available = float(self.resources[x, y, r_type])
+    def consume_resource(self, x: int, y: int,
+                         r_type: int, amount: float) -> float:
+        bx, by = x % self.size, y % self.size
+        available = float(self.resources[bx, by, r_type])
         consumed  = min(available, amount)
-        self.resources[x, y, r_type] -= consumed
+        self.resources[bx, by, r_type] -= consumed
         return consumed
 
-    # ── Knowledge field access ───────────────────────────────────────────────
+    # ── Knowledge field ──────────────────────────────────────────────────────
 
     def get_knowledge_field(self, x: int, y: int) -> float:
-        """Get knowledge field intensity at (x, y)."""
         return float(self.knowledge_field[x % self.size, y % self.size])
 
-    def boost_knowledge_field(self, x: int, y: int,
-                              amount: float = 0.5) -> None:
-        """Boost knowledge field at (x, y) — called when agents invent."""
+    def boost_knowledge_field(self, x: int, y: int, amount: float) -> None:
         bx, by = x % self.size, y % self.size
         self.knowledge_field[bx, by] = min(
-            10.0, self.knowledge_field[bx, by] + amount
+            5.0, self.knowledge_field[bx, by] + amount
         )
 
-    # ── Artifacts ────────────────────────────────────────────────────────────
+    def _diffuse_knowledge_field(self) -> None:
+        kf = self.knowledge_field
+        new_kf = (
+            kf
+            + np.roll(kf, 1, 0) + np.roll(kf, -1, 0)
+            + np.roll(kf, 1, 1) + np.roll(kf, -1, 1)
+        ) / 5.0
+        self.knowledge_field = new_kf * 0.997  # slow evaporation
 
-    def place_artifact(self, x: int, y: int, artifact: dict) -> None:
-        x, y = x % self.size, y % self.size
-        self.artifacts[(x, y)] = artifact
+    # ══════════════════════════════════════════════════════════════════════════
+    # NEW v3.0: PHYSICS ORACLE INTERFACE
+    # ══════════════════════════════════════════════════════════════════════════
 
-        # Promote to world knowledge if it's a discoverable concept
-        if artifact.get('type') in ('physics', 'math', 'language', 'ideology'):
-            self.world_knowledge[artifact['name']] = artifact
+    def query_oracle(self, vector_21: np.ndarray,
+                     local_signal_16: np.ndarray) -> np.ndarray:
+        """
+        Query the frozen PhysicsOracle.
+        Input:  21D agent vector + 16D local signal = 37D
+        Output: 5D (energy_flux, dx, dy, transmute, drain)
+        """
+        with torch.no_grad():
+            v = torch.tensor(vector_21[:21], dtype=torch.float32).unsqueeze(0)
+            s = torch.tensor(local_signal_16[:16], dtype=torch.float32).unsqueeze(0)
+            inp = torch.cat([v, s], dim=1)
+            effects = self.oracle(inp)[0]
+        return effects.numpy()
 
-        # Store in global memory (autoassociative imprint)
-        if 'godel' in artifact:
-            psi_enc = self._artifact_to_psi(artifact)
-            self.global_memory.store(psi_enc)
+    # ══════════════════════════════════════════════════════════════════════════
+    # NEW v3.0: PHEROMONE GRID (8-channel stigmergy)
+    # ══════════════════════════════════════════════════════════════════════════
 
-    def _artifact_to_psi(self, artifact: dict) -> np.ndarray:
-        """Encode an artifact into a K_DIM complex vector for memory storage."""
-        godel = artifact.get('godel', 0)
-        program = artifact.get('program', ['move'])
-        # Use Gödel number as phase seed, program length as amplitude
-        psi = np.zeros(K_DIM, dtype=complex)
-        for i, prim_name in enumerate(program):
-            from metacognition import PRIM_TO_IDX
-            idx = PRIM_TO_IDX.get(prim_name, 0)
-            phase = 2 * np.pi * idx / 16.0
-            dim = (i * 3 + idx) % K_DIM
-            psi[dim] += np.exp(1j * phase)
-        # Add Gödel-derived harmonics
-        for k in range(min(8, K_DIM)):
-            psi[k] += np.exp(1j * godel * 0.01 * k) * 0.3
-        norm = np.linalg.norm(psi)
-        if norm > 1e-12:
-            psi /= norm
-        return psi
+    def get_pheromone(self, x: int, y: int) -> np.ndarray:
+        return self.pheromone_grid[x % self.size, y % self.size].copy()
+
+    def deposit_pheromone(self, x: int, y: int, signal: np.ndarray) -> None:
+        bx, by = x % self.size, y % self.size
+        n = min(len(signal), 8)
+        self.pheromone_grid[bx, by, :n] += signal[:n]
+        np.clip(self.pheromone_grid[bx, by], 0.0, 1.0,
+                out=self.pheromone_grid[bx, by])
+
+    def _diffuse_pheromones(self) -> None:
+        """Pheromone diffusion: average with 4 neighbours, then evaporate 5%."""
+        g = self.pheromone_grid
+        diffused = (
+            g
+            + np.roll(g, 1, 0) + np.roll(g, -1, 0)
+            + np.roll(g, 1, 1) + np.roll(g, -1, 1)
+        ) / 5.0
+        self.pheromone_grid = diffused * 0.95  # 5% evaporation
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # NEW v3.0: MEME GRID (3-channel stigmergic cultural memory)
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def get_meme(self, x: int, y: int) -> np.ndarray:
+        return self.meme_grid[x % self.size, y % self.size].copy()
+
+    def deposit_meme(self, x: int, y: int, channel: int,
+                     value: float) -> None:
+        bx, by = x % self.size, y % self.size
+        self.meme_grid[bx, by, channel] = min(
+            1.0, self.meme_grid[bx, by, channel] + value
+        )
+
+    def _diffuse_meme_grid(self) -> None:
+        """Meme diffusion: 9-cell average + slow decay."""
+        mg = self.meme_grid
+        new_mg = np.zeros_like(mg)
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                new_mg += np.roll(np.roll(mg, dx, axis=0), dy, axis=1)
+        new_mg /= 9.0
+        self.meme_grid = 0.60 * new_mg + 0.40 * mg
+        self.meme_grid *= 0.99  # 1% decay per diffusion step
+        np.clip(self.meme_grid, 0.0, 1.0, out=self.meme_grid)
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # NEW v3.0: SOCIAL BOND REGISTRY + METABOLIC OSMOSIS
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def form_bond(self, id_a: str, id_b: str) -> None:
+        self.bonds.add(frozenset([id_a, id_b]))
+
+    def break_bond(self, id_a: str, id_b: str) -> None:
+        self.bonds.discard(frozenset([id_a, id_b]))
+
+    def get_bonded_partners(self, agent_id: str) -> List[str]:
+        partners = []
+        for bond in self.bonds:
+            if agent_id in bond:
+                partner = list(bond - {agent_id})
+                if partner:
+                    partners.append(partner[0])
+        return partners
+
+    def metabolic_osmosis(self, agents: dict) -> float:
+        """
+        Energy equalization between bonded agents.
+        Flow rate: 5% of difference, kinship-modulated efficiency.
+        """
+        dissipated = 0.0
+        dead_bonds = []
+        for bond in self.bonds:
+            ids = list(bond)
+            if len(ids) != 2:
+                continue
+            id_a, id_b = ids
+            a = agents.get(id_a)
+            b = agents.get(id_b)
+            if not a or not b or not a.alive or not b.alive:
+                dead_bonds.append(bond)
+                continue
+
+            # Flow from high to low
+            if a.energy > b.energy:
+                donor, receiver = a, b
+            else:
+                donor, receiver = b, a
+
+            delta = (donor.energy - receiver.energy) * 0.05
+            # Tribal kinship modulates efficiency
+            kinship = 1.0 if (a.tribe_id and a.tribe_id == b.tribe_id) else 0.5
+            efficiency = 0.5 + 0.5 * kinship
+
+            if donor.energy > delta:
+                donor.energy    -= delta
+                receiver.energy += delta * efficiency
+                dissipated      += delta * (1.0 - efficiency)
+
+        # Clean dead bonds
+        for bond in dead_bonds:
+            self.bonds.discard(bond)
+
+        return dissipated
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # NEW v3.0: STRUCTURE MANAGEMENT
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def add_structure(self, x: int, y: int, struct_type: str,
+                      builder_id: str, **kwargs) -> bool:
+        key = (x % self.size, y % self.size)
+        if key in self.structures:
+            return False
+
+        if struct_type == "trap":
+            self.structures[key] = Trap(
+                key[0], key[1], builder_id,
+                kwargs.get("harvest_rate", 0.2)
+            )
+        elif struct_type == "battery":
+            self.structures[key] = Battery(key[0], key[1], builder_id)
+        elif struct_type == "cultivator":
+            self.structures[key] = Cultivator(key[0], key[1], builder_id)
+            self._update_cultivator_map()
+        else:
+            self.structures[key] = Structure(
+                key[0], key[1], struct_type, builder_id
+            )
+
+        self.structures[key].created_tick = self.step_count
+        return True
+
+    def _update_cultivator_map(self) -> None:
+        self.cultivator_map = {}
+        for (x, y), struct in self.structures.items():
+            if isinstance(struct, Cultivator):
+                for tile in struct.get_influenced_tiles(self.size):
+                    current = self.cultivator_map.get(tile, 0.0)
+                    self.cultivator_map[tile] = min(
+                        1.0, current + struct.boost_strength
+                    )
+
+    def process_structures(self, agents: dict = None) -> None:
+        """Process structure effects: decay, trap harvest."""
+        to_remove = []
+        for key, struct in self.structures.items():
+            if not struct.decay(0.05):
+                to_remove.append(key)
+                continue
+
+            # Trap: harvest passing agents
+            if isinstance(struct, Trap) and agents:
+                for a in agents.values():
+                    if a.alive and (a.x % self.size, a.y % self.size) == key:
+                        taken = struct.harvest(a.id, a.energy)
+                        if taken > 0:
+                            a.energy -= taken
+
+            # Battery auto-interaction
+            if isinstance(struct, Battery) and agents:
+                if struct.stored_energy < 0:
+                    struct.stored_energy = 0.0
+                for a in agents.values():
+                    if a.alive and (a.x % self.size, a.y % self.size) == key:
+                        if a.energy > 8.0:
+                            struct.deposit(1.0)
+                        elif a.energy < 3.0:
+                            withdrawn = struct.withdraw(a.id)
+                            a.energy = min(10.0, a.energy + withdrawn)
+
+        for key in to_remove:
+            del self.structures[key]
+        if to_remove:
+            self._update_cultivator_map()
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # NEW v3.0: WEATHER CONTROL (collective agent votes)
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def update_weather_control(self, agents: dict) -> None:
+        if not agents:
+            return
+        votes = [getattr(a, 'weather_vote', 0.0)
+                 for a in agents.values() if a.alive]
+        if votes:
+            avg_vote = np.mean(votes)
+            target = 1.0 + avg_vote * 0.5
+            self.weather_amplitude = (
+                self.weather_amplitude * 0.95 + target * 0.05
+            )
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # NEW v3.0: MEGA RESOURCE (cooperative harvest)
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def spawn_mega_resource(self) -> None:
+        x = self.rng.randint(0, self.size)
+        y = self.rng.randint(0, self.size)
+        self.mega_resources[(x, y)] = MegaResource(x, y)
+        # Boost knowledge field at mega site
+        self.boost_knowledge_field(x, y, 3.0)
+
+    def attempt_mega_harvest(self, x: int, y: int,
+                             agents_at_pos: list) -> float:
+        """
+        Try to harvest a MegaResource. Returns energy per agent if success.
+        Requires >= required_agents at the position.
+        """
+        key = (x % self.size, y % self.size)
+        mega = self.mega_resources.get(key)
+        if mega is None:
+            return 0.0
+        if len(agents_at_pos) >= mega.required_agents:
+            share = mega.value / len(agents_at_pos)
+            del self.mega_resources[key]
+            return share
+        return 0.0
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # NEW v3.0: KURAMOTO ORDER PARAMETER
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def _compute_kuramoto_order(self, agents: dict) -> None:
+        """Calculate global Kuramoto order parameter: r = |⟨e^{iθ}⟩|."""
+        phases = [getattr(a, 'kuramoto_phase', 0.0)
+                  for a in agents.values() if a.alive]
+        if len(phases) > 1:
+            complex_order = np.mean([np.exp(1j * p) for p in phases])
+            self.kuramoto_order_parameter = float(abs(complex_order))
+        else:
+            self.kuramoto_order_parameter = 0.0
+
+    # ── Interference ─────────────────────────────────────────────────────────
+
+    def _compute_interference(self) -> None:
+        """Knowledge field constructive/destructive interference."""
+        kf = self.knowledge_field
+        shift_x = np.roll(kf, 1, 0)
+        shift_y = np.roll(kf, 1, 1)
+        interference = 0.05 * np.sin(kf * np.pi * 2) * np.cos(
+            shift_x * np.pi * 2
+        )
+        self.knowledge_field += interference
+        np.clip(self.knowledge_field, 0.0, 5.0, out=self.knowledge_field)
+
+    # ── World events ─────────────────────────────────────────────────────────
+
+    def _world_event(self) -> None:
+        """Stochastic world event: abundance burst or scarcity drought."""
+        event_type = self.rng.choice([
+            'abundance', 'scarcity', 'knowledge_bloom',
+            'resource_shift', 'nothing'
+        ])
+        if event_type == 'abundance':
+            cx, cy = self.rng.randint(0, self.size, 2)
+            for dx in range(-6, 7):
+                for dy in range(-6, 7):
+                    bx = (cx + dx) % self.size
+                    by = (cy + dy) % self.size
+                    self.resources[bx, by] += self.rng.exponential(1.0, N_RESOURCES)
+            np.clip(self.resources, 0, 15, out=self.resources)
+        elif event_type == 'scarcity':
+            cx, cy = self.rng.randint(0, self.size, 2)
+            for dx in range(-5, 6):
+                for dy in range(-5, 6):
+                    bx = (cx + dx) % self.size
+                    by = (cy + dy) % self.size
+                    self.resources[bx, by] *= 0.25
+        elif event_type == 'knowledge_bloom':
+            cx, cy = self.rng.randint(0, self.size, 2)
+            self.boost_knowledge_field(cx, cy, 4.0)
+        elif event_type == 'resource_shift':
+            # Rotate the resource grid slightly
+            shift = self.rng.randint(1, 4)
+            self.resources = np.roll(self.resources, shift, axis=0)
+
+    # ── Artifact access ──────────────────────────────────────────────────────
+
+    def place_artifact(self, x: int, y: int, art: dict) -> None:
+        key = (x % self.size, y % self.size)
+        self.artifacts[key] = art
 
     def get_artifact(self, x: int, y: int) -> Optional[dict]:
         return self.artifacts.get((x % self.size, y % self.size))
 
-    # ── Visualisation helpers ────────────────────────────────────────────────
+    # ── Stats ────────────────────────────────────────────────────────────────
 
-    def resource_heatmap(self) -> np.ndarray:
-        """Sum of all resources per cell."""
-        return self.resources.sum(axis=2)
-
-    def knowledge_field_heatmap(self) -> np.ndarray:
-        """Knowledge field values for visualisation."""
-        return self.knowledge_field.copy()
-
-    def artifact_positions(self) -> Tuple[List[int], List[int]]:
-        xs = [k[0] for k in self.artifacts]
-        ys = [k[1] for k in self.artifacts]
-        return xs, ys
-
-    def get_recent_events(self, n: int = 6) -> List[dict]:
-        return self.events[-n:]
+    def get_stats(self) -> dict:
+        return {
+            'step'                  : self.step_count,
+            'total_resources'       : float(self.resources.sum()),
+            'n_artifacts'           : len(self.artifacts),
+            'knowledge_avg'         : float(self.knowledge_field.mean()),
+            'season'                : 'Winter' if self.season % 2 == 1 else 'Summer',
+            'weather_amplitude'     : round(self.weather_amplitude, 3),
+            'n_bonds'               : len(self.bonds),
+            'n_structures'          : len(self.structures),
+            'n_mega_resources'      : len(self.mega_resources),
+            'kuramoto_order'        : round(self.kuramoto_order_parameter, 4),
+            'pheromone_activity'    : float(self.pheromone_grid.sum()),
+            'meme_activity'         : float(self.meme_grid.sum()),
+        }

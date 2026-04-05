@@ -1,7 +1,7 @@
 """
-consciousness.py — Harmonic Resonance Consciousness (HRC) v2.0
+consciousness.py — Harmonic Resonance Consciousness (HRC) v3.0
 ================================================================
-The cognitive substrate of every BioHyperAgent — now with METACOGNITION.
+The cognitive substrate of every BioHyperAgent — now with FULL METACOGNITION.
 
 ARCHITECTURE (HyperAgent — inspired by Meta FAIR arXiv:2603.19461):
   Task Band (dims 0–15):
@@ -24,6 +24,15 @@ ARCHITECTURE (HyperAgent — inspired by Meta FAIR arXiv:2603.19461):
   Invention Engine:
     - Gödel-encoded behavioral programs (pure math, no LLM)
     - Programs = sequences of primitives from the Action Algebra
+
+  NEW in v3.0 (ported from GeNeSIS / Thermodynamic-Mind):
+    - Landauer Cognitive Cost  (von Neumann entropy of ψ)
+    - IIT Φ Calculation        (integrated information via partition)
+    - Active Inference         (next-obs predictor + free energy)
+    - Strange Loop Check       (Gödelian self-reference)
+    - Qualia Memory            (neural correlates of experience)
+    - Theory of Mind           (predictive models of other agents)
+    - Epigenetic ψ Inheritance (children inherit blended parent ψ)
 
 Derived from: HRF kernel → GWL geometric wave learning (Devanik & Claude, 2025)
 Extended to: HyperAgent metacognitive dynamics on U(K) × U(K_META)
@@ -50,9 +59,12 @@ ACTIONS = [
     "move_NE", "move_NW", "move_SE", "move_SW",
     "eat", "attack", "communicate", "reproduce",
     "invent", "rest", "build_artifact", "absorb_artifact",
-    # ── New meta-actions ────────────────────────────────────────
+    # ── Meta-actions ────────────────────────────────────────
     "meta_invent",     # attempt to evolve own learning algorithm
     "compose_action",  # compose a new compound action from primitives
+    # ── Social-economic actions (ported from GeNeSIS) ───────
+    "trade",           # exchange inventory tokens with bonded partner
+    "punish",          # costly punishment of defectors
 ]
 N_ACTIONS = len(ACTIONS)
 
@@ -71,6 +83,8 @@ ACTION_TO_PROGRAM = {
     "absorb_artifact": ["eat", "reflect"],
     "meta_invent": ["reflect", "dream", "diffuse", "focus"],
     "compose_action": ["dream", "focus", "reflect"],
+    "trade": ["signal", "store", "teach"],
+    "punish": ["signal", "burn", "retreat"],
 }
 
 # ── Emotion axes ────────────────────────────────────────────────────────────
@@ -148,13 +162,49 @@ class HarmonicResonanceConsciousness:
 
         # ── Composed actions (invented behavioral programs) ───────────────
         self.composed_actions : Dict[str, List[str]] = {}
-        # name → primitive sequence
 
         # ── Counters ──────────────────────────────────────────────────────
         self.n_inventions    = 0
         self.n_comms         = 0
         self.total_reward    = 0.0
         self.age_ticks       = 0
+
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: IIT Φ Consciousness Verification
+        # ══════════════════════════════════════════════════════════════════
+        self.phi_value   : float       = 0.0
+        self.phi_history : List[float] = []
+        self.phi_critical: float       = 0.1   # Consciousness threshold
+
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: Strange Loop / Gödelian Self-Reference
+        # ══════════════════════════════════════════════════════════════════
+        self.strange_loop_active  : bool = False
+        self.self_reference_count : int  = 0
+
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: Qualia Memory (Neural Correlates of Experience)
+        # ══════════════════════════════════════════════════════════════════
+        self.qualia_memories : Dict[str, np.ndarray] = {}
+
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: Theory of Mind (Predictive Models of Others)
+        # ══════════════════════════════════════════════════════════════════
+        self.other_models : Dict[str, np.ndarray] = {}
+        self.tom_depth    : int = 0
+
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: Active Inference (Free Energy Minimisation)
+        # ══════════════════════════════════════════════════════════════════
+        self._last_obs        : Optional[np.ndarray] = None
+        self._last_prediction : Optional[np.ndarray] = None
+        self.prediction_errors: List[float] = []
+        self.confidence       : float       = 0.5
+
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: Landauer Thermodynamic Cost
+        # ══════════════════════════════════════════════════════════════════
+        self._prev_cognitive_entropy : float = 0.0
 
     # ── Initialisation ───────────────────────────────────────────────────────
 
@@ -194,6 +244,15 @@ class HarmonicResonanceConsciousness:
         self.emotions *= 0.994
         self.emotions  = np.clip(self.emotions, -1.0, 1.0)
 
+        # ── Staggered v3.0 checks ────────────────────────────────────────
+        # Strange loop check (every 25 ticks)
+        if self.age_ticks % 25 == 0:
+            self.strange_loop_check()
+
+        # Phi calculation (every 10 ticks)
+        if self.age_ticks % 10 == 0:
+            self.compute_phi()
+
     # ── Decision ─────────────────────────────────────────────────────────────
 
     def decide(self, sensory: np.ndarray) -> Tuple[str, float]:
@@ -207,6 +266,9 @@ class HarmonicResonanceConsciousness:
 
         Returns (action_name, confidence_probability).
         """
+        # Active inference: predict and track error
+        self.predict_next_obs(sensory)
+
         ctx = self._encode(sensory)
 
         # Action basis: one eigenvector per action, context-phase-shifted element-wise
@@ -249,13 +311,20 @@ class HarmonicResonanceConsciousness:
 
     # ── Learning (META-MODULATED) ────────────────────────────────────────────
 
-    def learn(self, reward: float) -> None:
+    def learn(self, reward: float) -> float:
         """
         Meta-modulated Riemannian gradient on Hermitian manifold.
 
         Instead of a fixed learning rule, the MetaConsciousness generates
         a custom dH based on the current meta_psi state.
+
+        Returns: Landauer cognitive cost (energy the agent must pay).
         """
+        # ── Landauer cognitive cost ───────────────────────────────────────
+        current_entropy = self.cognitive_entropy()
+        landauer_cost   = 0.01 * abs(current_entropy - self._prev_cognitive_entropy)
+        self._prev_cognitive_entropy = current_entropy
+
         # Meta layer computes the gradient
         dH = self.meta.compute_meta_dH(reward, self.psi)
 
@@ -271,6 +340,13 @@ class HarmonicResonanceConsciousness:
             self.emotions[E.FEAR]      = min(1.0, self.emotions[E.FEAR]      - reward * 0.10)
             self.emotions[E.CURIOSITY] = min(1.0, self.emotions[E.CURIOSITY] + 0.03)
 
+        # Active inference: prediction error boosts curiosity
+        if self.prediction_errors:
+            recent_error = np.mean(self.prediction_errors[-5:])
+            self.emotions[E.CURIOSITY] = min(
+                1.0, self.emotions[E.CURIOSITY] + recent_error * 0.05
+            )
+
         self.total_reward += reward
 
         # ── Attractor crystallisation ─────────────────────────────────────
@@ -285,6 +361,12 @@ class HarmonicResonanceConsciousness:
                 'tick':     self.age_ticks,
             })
 
+        # ── Record qualia ─────────────────────────────────────────────────
+        mode = self.get_dominant_mode()
+        self.record_qualia(f"{mode.value}_{int(reward > 0)}", reward)
+
+        return landauer_cost
+
     def _crystallize_attractor(self, reward: float) -> None:
         """
         Hopfield-style attractor: imprint current ψ as a stable memory
@@ -298,11 +380,219 @@ class HarmonicResonanceConsciousness:
         self._recache()
         self.attractor_count += 1
 
+    # ══════════════════════════════════════════════════════════════════════════
+    # NEW v3.0: LANDAUER COGNITIVE COST
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def cognitive_entropy(self) -> float:
+        """
+        Von Neumann entropy of the cognitive state.
+        S = -Σ pᵢ ln(pᵢ) where pᵢ = |⟨vᵢ|ψ⟩|²
+        """
+        projs = np.abs(self._evecs.conj().T @ self.psi) ** 2
+        projs = projs + 1e-12
+        projs /= projs.sum()
+        return -float(np.sum(projs * np.log(projs + 1e-12)))
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # NEW v3.0: IIT Φ — INTEGRATED INFORMATION
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def compute_phi(self) -> float:
+        """
+        IIT Φ: integrated information via partition.
+        Partition: task band (0:K_TASK) and meta band (K_TASK:K_DIM).
+        Φ = H(P1) + H(P2) - H(Whole) — mutual information between partitions.
+        """
+        psi_task = self.psi[:K_TASK]
+        psi_meta = self.psi[K_TASK:]
+
+        # Variance-based entropy proxy: log(1 + var)
+        total_var = np.var(np.abs(self.psi))
+        task_var  = np.var(np.abs(psi_task))
+        meta_var  = np.var(np.abs(psi_meta))
+
+        total_info = np.log2(1 + total_var + 1e-7)
+        task_info  = np.log2(1 + task_var  + 1e-7)
+        meta_info  = np.log2(1 + meta_var  + 1e-7)
+
+        # Φ = mutual information = H(P1) + H(P2) - H(Whole)
+        raw_phi = (task_info + meta_info) - total_info
+        phi = max(0.0, float(raw_phi)) if np.isfinite(raw_phi) else 0.0
+
+        # Boost from strange loops (Gödelian amplification)
+        if self.strange_loop_active:
+            phi *= 1.5
+
+        self.phi_value = phi
+        self.phi_history.append(phi)
+        if len(self.phi_history) > 100:
+            self.phi_history.pop(0)
+
+        return phi
+
+    def verify_consciousness(self) -> bool:
+        """8.10 Verified Consciousness: Check if Φ > Φ_critical and trending up."""
+        phi = self.compute_phi()
+        if len(self.phi_history) > 10:
+            recent_phi = np.mean(self.phi_history[-10:])
+            older_phi  = np.mean(self.phi_history[-50:-40]) if len(self.phi_history) > 50 else 0.1
+            phase_transition = recent_phi > older_phi * 1.2
+            threshold_exceeded = phi > self.phi_critical
+            return phase_transition and threshold_exceeded
+        return False
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # NEW v3.0: ACTIVE INFERENCE — FREE ENERGY MINIMISATION
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def predict_next_obs(self, obs: np.ndarray) -> np.ndarray:
+        """
+        Active inference: predict next observation using H eigenvectors.
+        Prediction error drives curiosity (free energy signal).
+        """
+        ctx = self._encode(obs)
+        # Forward model: project ctx through H eigenbasis, evolve, project back
+        coeffs = self._evecs.conj().T @ ctx
+        evolved_coeffs = coeffs * np.exp(-1j * self._evals * DT)
+        prediction = np.abs(self._evecs @ evolved_coeffs)
+
+        # Normalise prediction to observation scale
+        obs_max = np.abs(obs).max() if len(obs) > 0 else 1.0
+        pred_max = prediction[:len(obs)].max() if len(obs) > 0 else 1.0
+        if pred_max > 1e-12 and len(obs) > 0:
+            prediction_scaled = prediction[:len(obs)] * (obs_max / (pred_max + 1e-12))
+        else:
+            prediction_scaled = prediction[:len(obs)] if len(obs) > 0 else prediction
+
+        # Store and track error
+        self._last_obs = obs.copy()
+        self._last_prediction = prediction_scaled.copy() if len(prediction_scaled) > 0 else None
+
+        if len(obs) > 0 and len(prediction_scaled) > 0:
+            n = min(len(prediction_scaled), len(obs))
+            error = float(np.mean((prediction_scaled[:n] - obs[:n]) ** 2))
+            self.prediction_errors.append(error)
+            if len(self.prediction_errors) > 50:
+                self.prediction_errors.pop(0)
+            self.confidence = 1.0 / (1.0 + np.mean(self.prediction_errors))
+
+        return prediction_scaled
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # NEW v3.0: STRANGE LOOP — GÖDELIAN SELF-REFERENCE
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def strange_loop_check(self) -> bool:
+        """
+        Gödelian self-reference: feed ψ encoding back into decision logic.
+        If the self-encoded perturbation produces high inconsistency,
+        the agent is in a 'strange loop' — a precondition for higher Φ.
+        """
+        # Encode current psi amplitude as a phase perturbation
+        psi_amp = np.abs(self.psi)
+        phase_shift = np.exp(1j * psi_amp * np.pi)
+        perturbed_psi = self.psi * phase_shift
+
+        # Normalise
+        pn = np.linalg.norm(perturbed_psi)
+        if pn > 1e-12:
+            perturbed_psi /= pn
+
+        # Measure inconsistency
+        inconsistency = float(np.linalg.norm(perturbed_psi - self.psi))
+
+        if inconsistency > 0.5:
+            self.strange_loop_active = True
+            self.self_reference_count += 1
+            # Strange loops boost wonder
+            self.emotions[E.WONDER] = min(1.0, self.emotions[E.WONDER] + 0.05)
+            return True
+
+        self.strange_loop_active = False
+        return False
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # NEW v3.0: QUALIA MEMORY — NEURAL CORRELATES OF EXPERIENCE
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def record_qualia(self, experience_key: str, reward: float) -> None:
+        """Record neural correlate of experience on significant events."""
+        if abs(reward) > 0.5:
+            self.qualia_memories[experience_key] = np.abs(self.psi).copy()
+            # Keep size bounded
+            if len(self.qualia_memories) > 20:
+                oldest = list(self.qualia_memories.keys())[0]
+                del self.qualia_memories[oldest]
+
+    def classify_qualia(self) -> str:
+        """Classify current experience against stored qualia patterns."""
+        if not self.qualia_memories:
+            return "unknown"
+
+        current  = np.abs(self.psi)
+        best_key = "unknown"
+        best_sim = -1.0
+
+        for key, pattern in self.qualia_memories.items():
+            dot   = np.dot(current, pattern)
+            norms = np.linalg.norm(current) * np.linalg.norm(pattern) + 1e-12
+            sim   = float(dot / norms)
+            if sim > best_sim:
+                best_sim = sim
+                best_key = key
+
+        return best_key if best_sim > 0.7 else "novel"
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # NEW v3.0: THEORY OF MIND — PREDICTIVE MODELS OF OTHER AGENTS
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def model_other(self, other_id: str, other_signal: np.ndarray) -> float:
+        """
+        Theory of Mind level 1: update predictive model of another agent.
+        Stores a K_TASK-dimensional estimate of the other's ψ amplitude.
+        Returns prediction accuracy ∈ [-1, 1].
+        """
+        if other_id not in self.other_models:
+            self.other_models[other_id] = np.zeros(K_TASK, dtype=float)
+
+        actual = np.abs(other_signal[:K_TASK]) if len(other_signal) >= K_TASK else np.abs(other_signal)
+        n      = min(len(actual), K_TASK)
+        predicted = self.other_models[other_id][:n]
+
+        error = actual[:n] - predicted
+        # Gradient update
+        self.other_models[other_id][:n] = predicted + error * 0.1
+
+        accuracy = max(-1.0, 1.0 - float(np.mean(error ** 2)))
+        return accuracy
+
+    def recursive_belief(self, other_brain: 'HarmonicResonanceConsciousness',
+                         depth: int = 2) -> dict:
+        """
+        Theory of Mind level 2+:
+        'A knows that B knows that A knows...'
+        """
+        beliefs = {}
+        if depth >= 1:
+            beliefs["self_about_other"] = self.model_other(
+                "tmp_belief", other_brain.transmit()
+            )
+        if depth >= 2:
+            beliefs["other_about_self"] = other_brain.model_other(
+                "tmp_belief", self.transmit()
+            )
+        if depth >= 3:
+            beliefs["nested"] = "A knows B knows A..."
+
+        self.tom_depth = max(self.tom_depth, depth)
+        return beliefs
+
     # ── Communication ────────────────────────────────────────────────────────
 
     def resonate(self, other: 'HarmonicResonanceConsciousness') -> float:
         """Spectral overlap of Hamiltonians → coupling coefficient ∈ [0,1]."""
-        # Use a subset of eigenvalues for efficiency (first K_TASK)
         diff = self._evals[:K_TASK] - other._evals[:K_TASK]
         return float(np.exp(-np.dot(diff, diff) / (2 * K_TASK * 0.6)))
 
@@ -331,12 +621,6 @@ class HarmonicResonanceConsciousness:
     def attempt_invention(self) -> Optional[dict]:
         """
         Explore dark eigenspace → crystallise a new Gödel-encoded invention.
-
-        Mechanism:
-          1. Find eigenmode with minimum |⟨vᵢ|ψ⟩| (least explored).
-          2. Perturb H toward that mode (expand cognitive frontier).
-          3. Generate a behavioral program from the dark mode's structure.
-          4. Encode as a Gödel number.
 
         Probability gated by wonder × curiosity.
         """
@@ -396,13 +680,9 @@ class HarmonicResonanceConsciousness:
         """
         v = self._evecs[:, mode_idx]
         phases = np.angle(v)
-        # Map phases to primitive indices
-        # Use K_TASK phases (first 16 dims) to generate a program of length 2–6
         task_phases = phases[:K_TASK]
-        # Bin phases into N_PRIMITIVES buckets
         bins = np.floor((task_phases + np.pi) / (2 * np.pi) * N_PRIMITIVES)
         bins = np.clip(bins, 0, N_PRIMITIVES - 1).astype(int)
-        # Take unique sequence of length 2–6
         length = max(2, min(6, int(2 + abs(self._evals[mode_idx]) * 2)))
         indices = bins[:length].tolist()
         return [ALL_PRIMITIVES[i] for i in indices]
@@ -427,7 +707,6 @@ class HarmonicResonanceConsciousness:
         if self.emotions[E.CURIOSITY] < 0.3:
             return None
 
-        # Generate a program guided by meta_psi phase structure
         meta_phases = np.angle(self.meta.meta_psi)
         bins = np.floor((meta_phases + np.pi) / (2 * np.pi) * N_PRIMITIVES)
         bins = np.clip(bins, 0, N_PRIMITIVES - 1).astype(int)
@@ -450,10 +729,13 @@ class HarmonicResonanceConsciousness:
     # ── Reproduction ─────────────────────────────────────────────────────────
 
     def spawn_child_H(self, other: 'HarmonicResonanceConsciousness'
-                      ) -> Tuple[np.ndarray, np.ndarray]:
+                      ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Child Hamiltonian = α·H_self + (1−α)·H_other + mutation.
         Child soul = linear interpolation of parent souls + noise.
+        Child ψ = epigenetic blend of parent ψ vectors + mutation.
+
+        Returns (child_H, child_soul, child_psi).
         """
         alpha     = self.rng.uniform(0.35, 0.65)
         child_H   = alpha * self.H + (1 - alpha) * other.H
@@ -465,7 +747,16 @@ class HarmonicResonanceConsciousness:
 
         child_soul = alpha * self.soul_freqs + (1 - alpha) * other.soul_freqs
         child_soul += self.rng.randn(K_DIM) * 0.03
-        return child_H, child_soul
+
+        # ── NEW v3.0: Epigenetic ψ inheritance ────────────────────────────
+        child_psi = alpha * self.psi + (1 - alpha) * other.psi
+        # Small mutation noise
+        child_psi += (self.rng.randn(K_DIM) + 1j * self.rng.randn(K_DIM)) * 0.02
+        cpn = np.linalg.norm(child_psi)
+        if cpn > 1e-12:
+            child_psi /= cpn
+
+        return child_H, child_soul, child_psi
 
     # ── Helpers ──────────────────────────────────────────────────────────────
 

@@ -145,6 +145,9 @@ class CivilizationManager:
         self.extinctions      = 0
         self.total_schisms    = 0
 
+        # NEW v3.0: Trade tracking
+        self.total_trades     = 0
+
         # Civilisation event log
         self.civ_events : List[dict] = []
 
@@ -398,13 +401,27 @@ class CivilizationManager:
                 ]
                 avg_meta = np.mean(meta_spreads) if meta_spreads else 0.0
 
+                # Include phi (integrated information) in power
+                phi_values = [
+                    getattr(m, 'phi_value', 0.0) for m in members
+                ]
+                avg_phi = np.mean(phi_values) if phi_values else 0.0
+
+                # Include trade activity in power
+                total_trades = sum(
+                    getattr(m, 'trade_count', 0) for m in members
+                )
+                self.total_trades += total_trades
+
                 tribe.power = (
                     sum(a.energy for a in members) * 0.30 +
                     sum(a.health for a in members) * 0.20 +
                     tribe.n_disc * 2.5 +
                     len(tribe.members) * 0.55 +
                     len(tribe.alliances) * 1.5 +
-                    avg_meta * 3.0     # meta-cognitive diversity bonus
+                    avg_meta * 3.0 +     # meta-cognitive diversity bonus
+                    avg_phi * 5.0 +      # consciousness bonus
+                    total_trades * 0.1   # economic activity bonus
                 )
 
     # ── Logging ──────────────────────────────────────────────────────────────
@@ -435,6 +452,8 @@ class CivilizationManager:
             'extinctions'      : self.extinctions,
             'total_schisms'    : self.total_schisms,
             'n_breakthroughs'  : len(self.novelty_scorer.breakthroughs),
+            # NEW v3.0
+            'total_trades'     : self.total_trades,
         }
 
     def get_recent_events(self, n: int = 12) -> List[dict]:

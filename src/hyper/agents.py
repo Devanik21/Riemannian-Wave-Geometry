@@ -1,19 +1,37 @@
 """
-agents.py — BioHyperAgent v2.0
+agents.py — BioHyperAgent v3.0
 ================================
-A truly bio-inspired living organism with METACOGNITIVE self-modification.
+A truly bio-inspired living organism with METACOGNITIVE self-modification
+and FULL SOCIAL-ECONOMIC dynamics ported from GeNeSIS.
 
 SOUL    : Immutable spectral frequency signature  (eigenfrequency identity)
-BRAIN   : HarmonicResonanceConsciousness v2.0     (wave-based cognition + meta-layer)
+BRAIN   : HarmonicResonanceConsciousness v3.0     (wave-based cognition + meta-layer)
 META    : MetaConsciousness                        (self-modifying learning rules)
 BODY    : Physical presence, energy metabolism, health, aging
 WILL    : Autonomous action selection — no external task, no reward shaping
-DEATH   : Finite lifespan; leaves legacy artifact
+DEATH   : Finite lifespan; leaves legacy artifact + apoptotic death packet
 
-Actions:
+NEW in v3.0 (ported from GeNeSIS / Thermodynamic-Mind):
+  Social Bonds & Trust Memory   : Persistent relationships with metabolic osmosis
+  Inventory Economy              : Red/Green/Blue tokens with synergy bonus
+  Role / Caste System            : Forager, Processor, Warrior, Queen
+  Trade & Punish Actions         : Economic and punitive social actions
+  Epigenetic ψ Inheritance       : Children inherit blended parent ψ
+  Kuramoto Phase Sync            : Per-agent oscillatory phase
+  Viral Gene Transfer            : H-eigenvalue meme packets
+  GoL Scratchpad                 : Conway's Game of Life as internal computation
+  Apoptotic Death Packets        : Broadcast H spectral fingerprint on death
+  Landauer Cognitive Cost        : Thermodynamic cost of thinking
+  Causal Bayesian Model          : P(R|do(A)) intervention tracking
+  Weather Voting                 : Collective environmental modulation
+  IQ Complexity Bonus            : ψ diversity incentive
+  Circadian Internal Phase       : Circadian synchronization with seasons
+
+Actions (20):
   Base: move (8 dirs), eat, attack, communicate, reproduce,
         invent, rest, build_artifact, absorb_artifact
-  New:  meta_invent, compose_action
+  Meta: meta_invent, compose_action
+  Social: trade, punish
 
 Population: 72 initial (capped at 128 for Streamlit/K_DIM=32 performance).
 
@@ -35,7 +53,6 @@ from consciousness import (
 )
 
 # ── Physics constants ────────────────────────────────────────────────────────
-# Expanded to K_DIM=32 primes for soul frequency base
 _BASE_FREQS = np.array([
     1.0,  2.0,  3.0,  5.0,  7.0,  11.0,  13.0,  17.0,
     19.0, 23.0, 29.0, 31.0, 37.0, 41.0,  43.0,  47.0,
@@ -46,15 +63,16 @@ _BASE_FREQS = np.array([
 
 class BioHyperAgent:
     """
-    One living organism inside the Spectral Life simulation.
+    One living organism inside the Hyper-Horizon simulation.
 
     Lifecycle:
         spawn → live (sense → decide → act → learn → evolve) → die → legacy
 
-    Social dynamics emerge from resonance coupling between agents.
+    Social dynamics emerge from resonance coupling, bonds, and trade.
     Technology propagates via artifact placement and absorption.
     Civilisations form when resonance-compatible agents cluster.
     Meta-learning evolves through inheritance and self-modification.
+    Roles emerge from caste genes and behavioral clustering.
     """
 
     # ── Life constants ───────────────────────────────────────────────────────
@@ -63,11 +81,13 @@ class BioHyperAgent:
     MOVE_COST         = 0.001
     ATTACK_COST       = 0.05
     REPRODUCE_COST    = 0.15
-    INVENT_COST       = 0.04
-    BUILD_COST        = 0.01
-    COMMUNICATE_COST  = 0.001
-    META_INVENT_COST  = 0.05
-    COMPOSE_COST      = 0.02
+    INVENT_COST       = 0.05
+    BUILD_COST        = 0.05
+    COMMUNICATE_COST  = 0.002
+    META_INVENT_COST  = 0.10
+    COMPOSE_COST      = 0.05
+    TRADE_COST        = 0.02
+    PUNISH_COST       = 0.08
 
     def __init__(
         self,
@@ -106,7 +126,7 @@ class BioHyperAgent:
         self.age      = 0
         self.alive    = True
 
-        # ── Social ──────────────────────────────────────────────────────
+        # ── Social (original) ───────────────────────────────────────────
         self.tribe_id        : Optional[str] = None
         self.reputation      : float         = 0.0
         self.n_kills         : int           = 0
@@ -121,23 +141,92 @@ class BioHyperAgent:
         self.tools               : List[str] = []
         self.absorbed_inventions : List[str] = []
 
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: Inventory Economy (Red/Green/Blue tokens)
+        # ══════════════════════════════════════════════════════════════════
+        self.inventory : List[int] = [0, 0, 0]
+
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: Role / Caste System
+        # ══════════════════════════════════════════════════════════════════
+        self.caste_gene   = self.rng.rand(4)  # [Forager, Processor, Warrior, Queen]
+        self.role         : str       = "Generalist"
+        self.role_history : List[str] = []
+        self.is_fertile   : bool      = True if generation == 0 else (self.rng.random() < 0.2)
+
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: Social Trust Memory
+        # ══════════════════════════════════════════════════════════════════
+        self.social_memory : Dict[str, float] = {}
+
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: Causal Bayesian Model — P(R|do(A))
+        # ══════════════════════════════════════════════════════════════════
+        self.causal_model : Dict[str, Dict[str, int]] = {}
+
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: Kuramoto Phase Synchronization
+        # ══════════════════════════════════════════════════════════════════
+        self.kuramoto_phase     : float = self.rng.random() * 2 * np.pi
+        self.natural_frequency  : float = 1.0 + self.rng.randn() * 0.1
+        self.coupling_strength  : float = 0.5
+
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: Circadian Internal Phase
+        # ══════════════════════════════════════════════════════════════════
+        self.internal_phase : float = self.rng.random() * 2 * np.pi
+
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: Weather Vote
+        # ══════════════════════════════════════════════════════════════════
+        self.weather_vote : float = 0.0
+
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: GoL Scratchpad (Turing-complete internal computation)
+        # ══════════════════════════════════════════════════════════════════
+        self.scratchpad       = np.zeros((32, 32), dtype=np.int8)
+        self.scratchpad_writes: int = 0
+
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: Viral Gene Transfer (H-eigenvalue meme packets)
+        # ══════════════════════════════════════════════════════════════════
+        self.meme_pool : List[dict] = []
+
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: Trade / Punish counters
+        # ══════════════════════════════════════════════════════════════════
+        self.trade_count  : int = 0
+        self.punish_count : int = 0
+
+        # ══════════════════════════════════════════════════════════════════
+        # NEW v3.0: Consciousness state mirrors (from brain)
+        # ══════════════════════════════════════════════════════════════════
+        self.phi_value          : float = 0.0
+        self.strange_loop_active: bool  = False
+
     # ── Soul generation ──────────────────────────────────────────────────────
 
     def _forge_soul(self) -> np.ndarray:
-        """
-        Soul = unique combination of prime-harmonic base frequencies
-        modulated by random phases and amplitudes (K_DIM=32).
-        """
         phases     = self.rng.uniform(0, 2 * np.pi, K_DIM)
         amplitudes = self.rng.exponential(1.0, K_DIM) + 0.1
         return _BASE_FREQS * np.cos(phases) * amplitudes
 
-    # ── Perception ───────────────────────────────────────────────────────────
+    # ── Perception (expanded) ────────────────────────────────────────────────
 
     def sense(self, world) -> np.ndarray:
         """
-        Build sensory observation vector:
-        local resource gradients + knowledge field + own state + social density.
+        Build sensory observation vector (expanded for v3.0):
+          - Local resource gradients (5×5 sparse sample)
+          - Own vitals
+          - Social density
+          - Knowledge field
+          - Meta eigenspread
+          - Pheromone channels (8)        [NEW]
+          - Meme grid channels (3)        [NEW]
+          - Season + circadian (3)        [NEW]
+          - Social trust average (1)      [NEW]
+          - Inventory state (3)           [NEW]
+          - Role encoding (1)             [NEW]
         """
         obs = []
 
@@ -157,16 +246,46 @@ class BioHyperAgent:
             len(self.brain.discoveries) / 20.0,
         ]
 
-        # Social density (nearby alive agents)
+        # Social density
         nearby_count = len(world.get_agents_near(self.x, self.y, radius=5))
         obs.append(nearby_count / 15.0)
 
-        # Knowledge field intensity at current position
-        kf_val = world.get_knowledge_field(self.x, self.y)
-        obs.append(kf_val)
+        # Knowledge field
+        obs.append(world.get_knowledge_field(self.x, self.y))
 
-        # Meta-cognitive eigenspread (self-awareness signal)
+        # Meta eigenspread
         obs.append(self.meta.eigenspread() / 5.0)
+
+        # ── NEW: Pheromone channels (8) ──────────────────────────────────
+        pheromone = world.get_pheromone(self.x, self.y)
+        obs.extend(pheromone.tolist())
+
+        # ── NEW: Meme grid channels (3) ──────────────────────────────────
+        meme = world.get_meme(self.x, self.y)
+        obs.extend(meme.tolist())
+
+        # ── NEW: Season + circadian (3) ──────────────────────────────────
+        obs.append(float(world.season % 2))               # 0=Summer, 1=Winter
+        obs.append(float(np.sin(self.internal_phase)))     # Circadian sin
+        obs.append(float(np.cos(self.internal_phase)))     # Circadian cos
+
+        # ── NEW: Social trust average (1) ────────────────────────────────
+        if self.social_memory:
+            obs.append(float(np.clip(
+                np.mean(list(self.social_memory.values())), -1, 1
+            )))
+        else:
+            obs.append(0.0)
+
+        # ── NEW: Inventory state (3) ─────────────────────────────────────
+        obs.extend([min(v, 5) / 5.0 for v in self.inventory])
+
+        # ── NEW: Role encoding (1) ───────────────────────────────────────
+        role_map = {
+            "Generalist": 0.0, "Forager": 0.25,
+            "Processor": 0.5, "Warrior": 0.75, "Queen": 1.0
+        }
+        obs.append(role_map.get(self.role, 0.0))
 
         return np.array(obs, dtype=float)
 
@@ -175,14 +294,25 @@ class BioHyperAgent:
     def step(self, world, all_agents: Dict[str, 'BioHyperAgent']
              ) -> Optional['BioHyperAgent']:
         """
-        One life tick.
-        Returns a child BioHyperAgent if reproduction occurs, else None.
+        One life tick. Returns a child if reproduction occurs, else None.
+
+        N-tick staggered execution:
+          Every tick:  sense, decide, act, learn, evolve, causal update
+          Every 5:     Kuramoto phase update
+          Every 10:    role update, GoL scratchpad step
+          Every 20:    meme absorption
+          Every 50:    viral meme broadcast
         """
         if not self.alive:
             return None
 
         self.age    += 1
         self.energy -= self.BASE_METABOLISM
+
+        # ── Circadian synchronisation ────────────────────────────────────
+        self.internal_phase += 0.1 * np.sin(
+            world.env_phase - self.internal_phase
+        )
 
         # Sensory input
         sensory = self.sense(world)
@@ -196,18 +326,60 @@ class BioHyperAgent:
         # Execute and collect reward
         reward, child = self._execute(action, world, all_agents)
 
-        # Learn from outcome (meta-modulated)
-        self.brain.learn(reward)
+        # Learn from outcome (meta-modulated) + get Landauer cost
+        landauer_cost = self.brain.learn(reward)
+        if landauer_cost:
+            self.energy -= landauer_cost * 0.5  # Thermodynamic cost of thinking
+
         self.brain.evolve()
+
+        # ── Causal model update ──────────────────────────────────────────
+        sign = "positive" if reward > 0 else "negative"
+        if action not in self.causal_model:
+            self.causal_model[action] = {"positive": 0, "negative": 0}
+        self.causal_model[action][sign] += 1
+
+        # ── IQ complexity bonus ──────────────────────────────────────────
+        psi_std = float(np.std(np.abs(self.brain.psi)))
+        self.energy += psi_std * 0.01  # Small bonus for cognitive diversity
+
+        # ── Sync consciousness state ─────────────────────────────────────
+        self.phi_value           = self.brain.phi_value
+        self.strange_loop_active = self.brain.strange_loop_active
 
         # Log
         self.last_action         = action
         self.last_action_success = (reward >= 0)
         self.action_counts[action] = self.action_counts.get(action, 0) + 1
 
+        # ── Staggered N-tick updates ─────────────────────────────────────
+
+        # Kuramoto phase update (every 5 ticks)
+        if self.age % 5 == 0:
+            nearby = [a for a in world.get_agents_near(
+                self.x, self.y, radius=3
+            ) if a.id != self.id and a.alive]
+            self.kuramoto_update(nearby)
+
+        # Role update (every 10 ticks)
+        if self.age % 10 == 0:
+            self.update_role()
+
+        # GoL scratchpad step (every 10 ticks, energy-gated)
+        if self.age % 10 == 5 and self.energy > 5.0:
+            self.run_gol_step()
+
+        # Meme absorption (every 20 ticks)
+        if self.age % 20 == 0 and self.meme_pool:
+            self._absorb_meme()
+
+        # Viral meme broadcast (every 50 ticks, energy-gated)
+        if self.age % 50 == 0 and self.energy > 7.0:
+            self._broadcast_meme(world)
+
         # Death check
         if self.energy <= 0 or self.health <= 0 or self.age >= self.MAX_AGE:
-            self.die(world)
+            self.die(world, all_agents)
 
         return child
 
@@ -218,11 +390,12 @@ class BioHyperAgent:
             CognitionMode.EXPLORE   : ["move_N","move_S","move_E","move_W",
                                         "move_NE","move_NW","move_SE","move_SW"],
             CognitionMode.SURVIVE   : ["eat","rest"],
-            CognitionMode.SOCIALIZE : ["communicate","rest"],
+            CognitionMode.SOCIALIZE : ["communicate","trade","rest"],
             CognitionMode.INVENT    : ["invent","absorb_artifact","meta_invent",
                                         "compose_action"],
             CognitionMode.REPRODUCE : ["reproduce","communicate"],
-            CognitionMode.DOMINATE  : ["attack","move_N","move_S","move_E","move_W"],
+            CognitionMode.DOMINATE  : ["attack","punish",
+                                        "move_N","move_S","move_E","move_W"],
             CognitionMode.MEDITATE  : ["rest","meta_invent","compose_action"],
         }
         mode    = self.brain.get_dominant_mode()
@@ -243,11 +416,13 @@ class BioHyperAgent:
             elif action == "communicate":      reward = self._communicate(world, all_agents)
             elif action == "reproduce":        reward, child = self._reproduce(world, all_agents)
             elif action == "invent":           reward = self._invent(world)
-            elif action == "rest":             reward = self._rest()
+            elif action == "rest":             reward = self._rest(world)
             elif action == "build_artifact":   reward = self._build_artifact(world)
             elif action == "absorb_artifact":  reward = self._absorb_artifact(world)
             elif action == "meta_invent":      reward = self._meta_invent(world)
             elif action == "compose_action":   reward = self._compose_action(world)
+            elif action == "trade":            reward = self._trade(world, all_agents)
+            elif action == "punish":           reward = self._punish(world, all_agents)
             else:                              reward = 0.0
         except Exception:
             reward = -0.05
@@ -267,19 +442,47 @@ class BioHyperAgent:
         self.energy -= self.MOVE_COST
         local_res    = float(world.resources[self.x, self.y].sum())
         art_bonus = 0.1 if world.get_artifact(self.x, self.y) else 0.0
-        # Knowledge field bonus — drawn to high-knowledge areas
         kf_bonus = world.get_knowledge_field(self.x, self.y) * 0.05
-        return local_res * 0.04 - 0.01 + art_bonus + kf_bonus
+        # Pheromone attraction bonus
+        pheromone = world.get_pheromone(self.x, self.y)
+        phero_bonus = float(pheromone.sum()) * 0.02
+        # Meme avoidance (danger channel)
+        meme = world.get_meme(self.x, self.y)
+        danger_penalty = -meme[0] * 0.05
+        return local_res * 0.04 - 0.01 + art_bonus + kf_bonus + phero_bonus + danger_penalty
 
     def _eat(self, world) -> float:
         eaten = 0.0
-        for r_type in range(2):
+        for r_type in range(3):   # 3 token types
             consumed = world.consume_resource(self.x, self.y, r_type, 1.2)
-            eaten   += consumed
-        gain        = eaten * 1.5
+            if consumed > 0.1:
+                self.inventory[r_type] = min(5, self.inventory[r_type] + 1)
+            eaten += consumed
+        # Rare element (type 3) - direct energy
+        consumed_rare = world.consume_resource(self.x, self.y, 3, 0.8)
+        eaten += consumed_rare
+
+        gain = eaten * 1.5
+        # Role bonus
+        if self.role == "Forager":
+            gain *= 1.2
+        elif self.role == "Processor" and any(v > 0 for v in self.inventory):
+            gain *= 1.5
+
         self.energy = min(10.0, self.energy + gain)
         self.health = min(1.0,  self.health + eaten * 0.1)
-        return gain + 0.02 # Positive baseline so they don't unlearn eating
+
+        # Synergy bonus: complete set (1 of each)
+        if all(v > 0 for v in self.inventory):
+            self.energy = min(10.0, self.energy + 1.5)
+            for i in range(3):
+                self.inventory[i] -= 1
+
+        # Deposit "resource found" meme
+        if eaten > 0.5:
+            world.deposit_meme(self.x, self.y, 1, 0.3)
+
+        return gain + 0.02
 
     def _attack(self, world, all_agents: Dict) -> float:
         nearby = [a for a in world.get_agents_near(self.x, self.y, radius=2)
@@ -292,22 +495,33 @@ class BioHyperAgent:
         target       = self.rng.choice(nearby)
         damage       = 0.13 + self.rng.random() * 0.09
 
+        # Shield from bonds
+        bonded_partners = world.get_bonded_partners(target.id)
+        if bonded_partners:
+            shield = min(0.5, len(bonded_partners) * 0.1)
+            damage *= (1.0 - shield)
+
         target.health -= damage
-        target.brain.emotions[E.FEAR]  = min(1.0, target.brain.emotions[E.FEAR]  + 0.45) # They just get scared, not angry
+        target.brain.emotions[E.FEAR]  = min(1.0, target.brain.emotions[E.FEAR]  + 0.45)
         target.brain.emotions[E.ANGER] = min(1.0, target.brain.emotions[E.ANGER] + 0.05)
+
+        # Social trust destruction
+        target.social_memory[self.id] = target.social_memory.get(self.id, 0) - 1.0
+
+        # Deposit danger meme
+        world.deposit_meme(self.x, self.y, 0, 0.5)
 
         if target.health <= 0:
             target.alive = False
             target.die(world)
             self.n_kills   += 1
-            self.reputation -= 2.0 # Huge penalty
-            loot = target.energy * 0.20 # Less loot incentive
+            self.reputation -= 2.0
+            loot = target.energy * 0.20
             self.energy = min(10.0, self.energy + loot)
-            # Removed anger spike so they don't get stuck in bloodlust mode
-            return 0.15 # Reduced reward from killing
+            return 0.15
 
         self.reputation -= 0.50
-        return -0.05 # Attacking someone and failing to kill them should be negatively reinforced
+        return -0.05
 
     def _communicate(self, world, all_agents: Dict) -> float:
         nearby = [a for a in world.get_agents_near(self.x, self.y, radius=5)
@@ -323,6 +537,9 @@ class BioHyperAgent:
         self.brain.receive(partner.brain.transmit(), coupling)
         partner.brain.receive(self.brain.transmit(), coupling)
 
+        # Theory of Mind update
+        self.brain.model_other(partner.id, partner.brain.transmit())
+
         # Knowledge diffusion — share one random discovery
         if self.brain.discoveries:
             disc = self.rng.choice(list(self.brain.discoveries.values()))
@@ -333,32 +550,57 @@ class BioHyperAgent:
                 )
                 self.brain.emotions[E.JOY] = min(1.0, self.brain.emotions[E.JOY] + 0.15)
 
+        # Social trust and bonding
         if coupling > 0.30:
+            self.social_memory[partner.id] = self.social_memory.get(partner.id, 0) + 0.1
+            partner.social_memory[self.id] = partner.social_memory.get(self.id, 0) + 0.1
             self.reputation    += 0.15
             partner.reputation += 0.15
+            # Form bond if high coupling
+            if coupling > 0.50:
+                world.form_bond(self.id, partner.id)
+
+        # Pheromone deposit (soul-modulated)
+        phero_sig = np.abs(self.brain.psi[:8]) * self.soul_freqs[:8]
+        phero_max = phero_sig.max() + 1e-12
+        world.deposit_pheromone(self.x, self.y, phero_sig / phero_max * 0.3)
 
         return coupling * 0.50 + 0.10
 
     def _reproduce(self, world, all_agents: Dict
                    ) -> Tuple[float, Optional['BioHyperAgent']]:
-        if self.energy < self.REPRODUCE_COST:
+        # Population-adaptive cost (Malthusian scaling)
+        n_pop = len([a for a in all_agents.values() if a.alive])
+        adaptive_cost = self.REPRODUCE_COST * (1.0 + 0.5 * (n_pop / 128.0) ** 2)
+
+        if self.energy < adaptive_cost:
             return -0.01, None
 
-        nearby = [a for a in world.get_agents_near(self.x, self.y, radius=12) # Huge radius so they find partners
+        # Eusociality: only fertile agents reproduce when pop is high
+        if not self.is_fertile and n_pop > 50:
+            return 0.01, None
+
+        nearby = [a for a in world.get_agents_near(self.x, self.y, radius=12)
                   if a.id != self.id and a.alive and a.energy > 0.5]
         if not nearby:
-            return 0.05, None # Positively reward the ATTEMPT so they don't unlearn reproducing
+            return 0.05, None
 
-        partner  = max(nearby, key=lambda a: self.brain.resonate(a.brain))
+        # Prefer high-trust + high-coupling partners
+        def partner_score(a):
+            coupling = self.brain.resonate(a.brain)
+            trust = self.social_memory.get(a.id, 0.0)
+            return coupling + trust * 0.2
+
+        partner  = max(nearby, key=partner_score)
         coupling = self.brain.resonate(partner.brain)
-        # Very low threshold to make reproduction easy
         if coupling < 0.01:
-            return 0.05, None # Keep rewarding the urge to mate!
+            return 0.05, None
 
-        self.energy    -= self.REPRODUCE_COST
-        partner.energy -= self.REPRODUCE_COST * 0.45
+        self.energy    -= adaptive_cost
+        partner.energy -= adaptive_cost * 0.45
 
-        child_H, child_soul = self.brain.spawn_child_H(partner.brain)
+        # Spawn child with epigenetic ψ inheritance
+        child_H, child_soul, child_psi = self.brain.spawn_child_H(partner.brain)
 
         cx = (self.x + self.rng.randint(-2, 3)) % self.world_size
         cy = (self.y + self.rng.randint(-2, 3)) % self.world_size
@@ -377,7 +619,10 @@ class BioHyperAgent:
         child.brain.H    = child_H
         child.brain._recache()
 
-        # ── Partial meta-H inheritance (60/40) ────────────────────────────
+        # Epigenetic ψ inheritance
+        child.brain.psi = child_psi
+
+        # Meta-H inheritance (60/40)
         child_meta_H, child_lr = MetaConsciousness.spawn_child_meta(
             self.meta, partner.meta, self.rng
         )
@@ -385,6 +630,14 @@ class BioHyperAgent:
         child.brain.meta.lr_field = child_lr
         child.brain.meta._recache_meta()
         child.meta = child.brain.meta
+
+        # Caste gene inheritance (blended + mutation)
+        alpha = self.rng.uniform(0.35, 0.65)
+        child.caste_gene = np.clip(
+            alpha * self.caste_gene + (1 - alpha) * partner.caste_gene
+            + self.rng.randn(4) * 0.05, 0, 1
+        )
+        child.is_fertile = self.rng.random() < 0.2 if child.generation > 0 else True
 
         child.energy = 2.2
 
@@ -398,12 +651,23 @@ class BioHyperAgent:
         self.brain.emotions[E.AFFECTION] = min(1.0, self.brain.emotions[E.AFFECTION] + 0.40)
         partner.brain.emotions[E.JOY] = min(1.0, partner.brain.emotions[E.JOY] + 0.48)
         partner.brain.emotions[E.AFFECTION] = min(1.0, partner.brain.emotions[E.AFFECTION] + 0.40)
+
+        # Deposit sacred meme at birth site
+        world.deposit_meme(cx, cy, 2, 0.4)
+
         return coupling * 0.85 + 0.20, child
 
     def _invent(self, world) -> float:
         if self.energy < self.INVENT_COST:
             return -0.06
         self.energy -= self.INVENT_COST
+
+        # Role bonus for invention
+        if self.role == "Processor":
+            self.brain.emotions[E.WONDER] = min(
+                1.0, self.brain.emotions[E.WONDER] + 0.10
+            )
+
         inv = self.brain.attempt_invention()
         if inv is None:
             return -0.12
@@ -412,16 +676,28 @@ class BioHyperAgent:
             'creator'  : self.id,
             'step'     : world.step_count,
         })
-        # Boost knowledge field at this location
         world.boost_knowledge_field(self.x, self.y, 1.5)
+        # Deposit sacred meme at invention site
+        world.deposit_meme(self.x, self.y, 2, 0.5)
         self.brain.emotions[E.WONDER] = min(1.0, self.brain.emotions[E.WONDER] + 0.50)
         return 1.45
 
-    def _rest(self) -> float:
+    def _rest(self, world=None) -> float:
         gain        = 0.22
         self.energy = min(10.0, self.energy + gain)
         self.health = min(1.0,  self.health + 0.018)
         self.brain.emotions *= 0.97
+
+        # Weather vote based on wonder
+        if world and hasattr(world, 'env_phase'):
+            self.weather_vote = float(self.brain.emotions[E.WONDER]) * 0.5
+
+        # Seed GoL scratchpad if wondering
+        if self.brain.emotions[E.WONDER] > 0.6 and self.energy > 5.0:
+            sx = int(self.x) % 32
+            sy = int(self.y) % 32
+            self.write_scratchpad(sx, sy, 1)
+
         return 0.04
 
     def _build_artifact(self, world) -> float:
@@ -432,6 +708,18 @@ class BioHyperAgent:
             return -0.05
         self.energy -= self.BUILD_COST
         consumed = world.consume_resource(self.x, self.y, 3, 0.25)
+
+        # Decide structure type based on role
+        if self.role == "Warrior" and self.rng.random() < 0.5:
+            world.add_structure(self.x, self.y, "trap", self.id)
+            return 0.35
+        elif self.role == "Processor" and self.rng.random() < 0.5:
+            world.add_structure(self.x, self.y, "battery", self.id)
+            return 0.35
+        elif self.role == "Forager" and self.rng.random() < 0.5:
+            world.add_structure(self.x, self.y, "cultivator", self.id)
+            return 0.40
+
         name     = f"Tool_{self.id}_{self.age}"
         world.place_artifact(self.x, self.y, {
             'name'      : name,
@@ -461,14 +749,12 @@ class BioHyperAgent:
     # ── NEW: Meta-invent ─────────────────────────────────────────────────────
 
     def _meta_invent(self, world) -> float:
-        """Attempt to evolve own learning algorithm (meta-H mutation)."""
         if self.energy < self.META_INVENT_COST:
             return -0.10
         self.energy -= self.META_INVENT_COST
         result = self.brain.attempt_meta_invention()
         if result is None:
             return -0.15
-        # Meta-invention boosts knowledge field too
         world.boost_knowledge_field(self.x, self.y, 2.0)
         self.brain.emotions[E.WONDER] = min(1.0, self.brain.emotions[E.WONDER] + 0.60)
         return 1.85
@@ -476,14 +762,12 @@ class BioHyperAgent:
     # ── NEW: Compose action ──────────────────────────────────────────────────
 
     def _compose_action(self, world) -> float:
-        """Compose a new compound action from the Primitive Action Algebra."""
         if self.energy < self.COMPOSE_COST:
             return -0.05
         self.energy -= self.COMPOSE_COST
         result = self.brain.compose_new_action()
         if result is None:
             return -0.08
-        # Store as a behavioral artifact in the world
         world.place_artifact(self.x, self.y, {
             **result,
             'type'      : 'ideology',
@@ -495,10 +779,177 @@ class BioHyperAgent:
         world.boost_knowledge_field(self.x, self.y, 0.3)
         return 0.50
 
-    # ── Death ────────────────────────────────────────────────────────────────
+    # ══════════════════════════════════════════════════════════════════════════
+    # NEW v3.0: TRADE ACTION
+    # ══════════════════════════════════════════════════════════════════════════
 
-    def die(self, world) -> None:
+    def _trade(self, world, all_agents: Dict) -> float:
+        """Exchange inventory tokens with a bonded partner."""
+        bonded = world.get_bonded_partners(self.id)
+        if not bonded:
+            return -0.02
+
+        self.energy -= self.TRADE_COST
+
+        for pid in bonded:
+            partner = all_agents.get(pid)
+            if not partner or not partner.alive:
+                continue
+            # Look for complementary tokens to trade
+            for i in range(3):
+                for j in range(3):
+                    if i != j and self.inventory[i] > 0 and partner.inventory[j] > 0:
+                        self.inventory[i] -= 1
+                        self.inventory[j] += 1
+                        partner.inventory[j] -= 1
+                        partner.inventory[i] += 1
+                        self.trade_count  += 1
+                        partner.trade_count += 1
+                        # Trust boost
+                        self.social_memory[pid] = self.social_memory.get(pid, 0) + 0.5
+                        partner.social_memory[self.id] = partner.social_memory.get(self.id, 0) + 0.5
+                        return 0.40
+        return -0.01
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # NEW v3.0: PUNISH ACTION
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def _punish(self, world, all_agents: Dict) -> float:
+        """Costly punishment of defectors. Costs energy, deals damage."""
+        nearby = [a for a in world.get_agents_near(self.x, self.y, radius=2)
+                  if a.id != self.id and a.alive]
+        if not nearby:
+            return -0.06
+
+        self.energy -= self.PUNISH_COST
+
+        # Target the agent with worst social trust
+        target = min(nearby, key=lambda a: self.social_memory.get(a.id, 0.0))
+        damage = 0.15
+        target.health -= damage
+        target.energy -= 0.10
+        target.brain.emotions[E.FEAR] = min(
+            1.0, target.brain.emotions[E.FEAR] + 0.30
+        )
+
+        # Trust destruction
+        target.social_memory[self.id] = target.social_memory.get(self.id, 0) - 1.0
+
+        # Deposit danger meme
+        world.deposit_meme(self.x, self.y, 0, 0.4)
+
+        self.punish_count += 1
+        self.reputation -= 0.30
+        return 0.05
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # NEW v3.0: ROLE / CASTE SYSTEM
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def update_role(self) -> None:
+        """Assign role based on caste genetics + current state."""
+        # Queens keep their role unless starving
+        if self.role == "Queen" and self.energy > 4.0:
+            return
+
+        if self.is_fertile and self.energy > 6.0 and self.age > 50:
+            self.role = "Queen"
+        elif any(v > 0 for v in self.inventory):
+            self.role = "Processor"
+        elif self.caste_gene[2] > 0.6 and self.energy > 5.0:
+            self.role = "Warrior"
+        elif self.caste_gene[0] > 0.5:
+            self.role = "Forager"
+        else:
+            self.role = "Generalist"
+
+        self.role_history.append(self.role)
+        if len(self.role_history) > 100:
+            self.role_history.pop(0)
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # NEW v3.0: KURAMOTO PHASE SYNCHRONIZATION
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def kuramoto_update(self, neighbors: list) -> None:
+        """
+        Kuramoto model: dθ/dt = ω + (K/N)Σ sin(θⱼ - θᵢ)
+        """
+        if not neighbors:
+            return
+        phase_diff_sum = sum(
+            np.sin(getattr(n, 'kuramoto_phase', 0) - self.kuramoto_phase)
+            for n in neighbors
+        )
+        n_count = len(neighbors)
+        d_theta = (self.natural_frequency
+                   + (self.coupling_strength / n_count) * phase_diff_sum)
+        self.kuramoto_phase = (self.kuramoto_phase + d_theta * 0.1) % (2 * np.pi)
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # NEW v3.0: GOL SCRATCHPAD (Turing-complete internal computation)
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def run_gol_step(self) -> None:
+        """One step of Conway's Game of Life on the internal scratchpad."""
+        pad = self.scratchpad
+        neighbors = (
+            np.roll(np.roll(pad, 1, 0), 1, 1) + np.roll(np.roll(pad, 1, 0), -1, 1) +
+            np.roll(np.roll(pad, -1, 0), 1, 1) + np.roll(np.roll(pad, -1, 0), -1, 1) +
+            np.roll(pad, 1, 0) + np.roll(pad, -1, 0) +
+            np.roll(pad, 1, 1) + np.roll(pad, -1, 1)
+        )
+        birth   = (neighbors == 3) & (pad == 0)
+        survive = ((neighbors == 2) | (neighbors == 3)) & (pad == 1)
+        self.scratchpad = (birth | survive).astype(np.int8)
+
+    def write_scratchpad(self, x: int, y: int, value: int) -> None:
+        if 0 <= x < 32 and 0 <= y < 32:
+            self.scratchpad[x, y] = 1 if value else 0
+            self.scratchpad_writes += 1
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # NEW v3.0: VIRAL GENE TRANSFER (H-eigenvalue meme packets)
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def _broadcast_meme(self, world) -> None:
+        """Create cognitive virus packet from H eigenvalues."""
+        packet = {
+            'eigenvals'    : self.brain._evals[:8].copy(),
+            'fitness'      : self.energy,
+            'soul_fragment': self.soul_freqs[:8].copy(),
+            'sender'       : self.id,
+        }
+        nearby = world.get_agents_near(self.x, self.y, radius=3)
+        for n in nearby:
+            if n.id != self.id and len(getattr(n, 'meme_pool', [])) < 5:
+                n.meme_pool.append(packet)
+
+    def _absorb_meme(self) -> None:
+        """Absorb the fittest meme from pool: blend H eigenvalues."""
+        if not self.meme_pool:
+            return
+        best = max(self.meme_pool, key=lambda m: m['fitness'])
+        self.meme_pool.clear()
+
+        eigenvals = best['eigenvals']
+        n = min(len(eigenvals), K_DIM)
+        for i in range(n):
+            self.brain.H[i, i] = self.brain.H[i, i] * 0.97 + eigenvals[i] * 0.03
+        self.brain.H = (self.brain.H + self.brain.H.conj().T) / 2
+        self.brain._recache()
+
+    # ── Death (with apoptotic information transfer) ──────────────────────────
+
+    def die(self, world, all_agents=None) -> None:
+        """
+        Death with apoptotic information transfer.
+        Broadcasts spectral fingerprint + top discoveries to nearby agents.
+        """
         self.alive = False
+
+        # Legacy artifact
         if self.brain.discoveries:
             legacy = list(self.brain.discoveries.values())[-1]
             world.place_artifact(self.x, self.y, {
@@ -508,35 +959,79 @@ class BioHyperAgent:
                 'step'     : world.step_count,
             })
 
+        # Apoptotic death packet
+        if all_agents:
+            death_packet = {
+                'spectral_fingerprint': self.brain._evals[:K_META].copy(),
+                'meta_H_fragment'     : self.brain.meta.meta_H[:8, :8].copy(),
+                'top_discoveries'     : list(self.brain.discoveries.keys())[-3:],
+                'soul_fragment'       : self.soul_freqs[:8].copy(),
+                'role'                : self.role,
+                'causal_model'        : dict(list(self.causal_model.items())[:5]),
+            }
+            nearby = [a for a in world.get_agents_near(self.x, self.y, radius=4)
+                      if a.id != self.id and a.alive]
+            for neighbor in nearby:
+                neighbor._receive_death_wisdom(death_packet)
+
+    def _receive_death_wisdom(self, packet: dict) -> None:
+        """Absorb wisdom from a dying agent. Blend H eigenvalues + causal knowledge."""
+        fingerprint = packet.get('spectral_fingerprint')
+        if fingerprint is not None:
+            n = min(len(fingerprint), K_META)
+            for i in range(n):
+                self.brain.H[i, i] = self.brain.H[i, i] * 0.97 + fingerprint[i] * 0.03
+            self.brain.H = (self.brain.H + self.brain.H.conj().T) / 2
+            self.brain._recache()
+
+        # Inherit causal knowledge
+        for action, counts in packet.get('causal_model', {}).items():
+            if action not in self.causal_model:
+                self.causal_model[action] = {"positive": 0, "negative": 0}
+            for sign, val in counts.items():
+                self.causal_model[action][sign] += max(0, val // 3)
+
     # ── Serialisation ────────────────────────────────────────────────────────
 
     def to_dict(self) -> dict:
         rgb = self.brain.spectral_rgb()
         return {
-            'id'          : self.id,
-            'x'           : self.x,
-            'y'           : self.y,
-            'energy'      : round(float(self.energy), 2),
-            'health'      : round(float(self.health), 3),
-            'age'         : int(self.age),
-            'alive'       : self.alive,
-            'generation'  : self.generation,
-            'tribe'       : self.tribe_id or 'Nomad',
-            'mode'        : self.brain.get_dominant_mode().value,
-            'last_action' : self.last_action,
-            'reputation'  : round(float(self.reputation), 2),
-            'inventions'  : len(self.brain.discoveries),
-            'absorbed'    : len(self.absorbed_inventions),
-            'kills'       : self.n_kills,
-            'children'    : self.n_children,
-            'color'       : f'rgb({rgb[0]},{rgb[1]},{rgb[2]})',
-            'r'           : rgb[0],
-            'g'           : rgb[1],
-            'b'           : rgb[2],
-            'curiosity'   : round(float(self.brain.emotions[E.CURIOSITY]), 2),
-            'wonder'      : round(float(self.brain.emotions[E.WONDER]), 2),
-            'fear'        : round(float(self.brain.emotions[E.FEAR]), 2),
+            'id'              : self.id,
+            'x'               : self.x,
+            'y'               : self.y,
+            'energy'          : round(float(self.energy), 2),
+            'health'          : round(float(self.health), 3),
+            'age'             : int(self.age),
+            'alive'           : self.alive,
+            'generation'      : self.generation,
+            'tribe'           : self.tribe_id or 'Nomad',
+            'mode'            : self.brain.get_dominant_mode().value,
+            'last_action'     : self.last_action,
+            'reputation'      : round(float(self.reputation), 2),
+            'inventions'      : len(self.brain.discoveries),
+            'absorbed'        : len(self.absorbed_inventions),
+            'kills'           : self.n_kills,
+            'children'        : self.n_children,
+            'color'           : f'rgb({rgb[0]},{rgb[1]},{rgb[2]})',
+            'r'               : rgb[0],
+            'g'               : rgb[1],
+            'b'               : rgb[2],
+            'curiosity'       : round(float(self.brain.emotions[E.CURIOSITY]), 2),
+            'wonder'          : round(float(self.brain.emotions[E.WONDER]), 2),
+            'fear'            : round(float(self.brain.emotions[E.FEAR]), 2),
             'meta_eigenspread': round(float(self.meta.eigenspread()), 3),
             'meta_inventions' : self.meta.n_meta_inventions,
             'composed_actions': len(self.brain.composed_actions),
+            # ── NEW v3.0 fields ──────────────────────────────────────────
+            'role'            : self.role,
+            'inventory'       : list(self.inventory),
+            'phi'             : round(float(self.phi_value), 3),
+            'strange_loop'    : self.strange_loop_active,
+            'kuramoto_phase'  : round(float(self.kuramoto_phase), 3),
+            'trade_count'     : self.trade_count,
+            'punish_count'    : self.punish_count,
+            'n_bonds'         : len(self.social_memory),
+            'scratchpad_writes': self.scratchpad_writes,
+            'tom_depth'       : self.brain.tom_depth,
+            'qualia'          : self.brain.classify_qualia(),
         }
