@@ -1831,15 +1831,23 @@ elif st.session_state.active_tab == "🧬 v3.0 EMERGENCE":
 
         if meme_ch_sel == "Composite RGB":
             mg_img = np.zeros((W.size, W.size, 3), dtype=np.float32)
-            mg_img[:, :, 0] = meme[:, :, 0]
+            # Mix channels to create rich CMYK-like vibrancy 
+            # Danger -> Red dominance, Resource -> Green dominance, Sacred -> Blue/Violet dominance
+            mg_img[:, :, 0] = meme[:, :, 0] + 0.3 * meme[:, :, 2]
             mg_img[:, :, 1] = meme[:, :, 1]
-            mg_img[:, :, 2] = meme[:, :, 2]
+            mg_img[:, :, 2] = meme[:, :, 2] + 0.2 * meme[:, :, 0]
+
             max_v = mg_img.max()
             if max_v > 1e-9:
                 mg_img /= max_v
+                
+            # Apply non-linear gamma curve to intensely boost diffusion trails and saturation
+            mg_img = np.power(mg_img, 0.45)
+            
             fig_meme = go.Figure(go.Image(
                 z=(np.clip(mg_img.transpose(1, 0, 2), 0, 1) * 255).astype(np.uint8),
             ))
+
         else:
             ch_map = {"Danger (red)": 0, "Resource (green)": 1, "Sacred (violet)": 2}
             ch_cs = {
