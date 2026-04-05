@@ -37,18 +37,18 @@ st.set_page_config(
 st.markdown("""
 <style>
 html, body, [class*="css"], .stApp, .main .block-container {
-    background-color: #05070a !important;
+    background-color: #000000 !important;
     color: #c4c4d4 !important;
-    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-family: 'Inter', 'JetBrains Mono', monospace;
 }
 
-h1 { color: #7DF9FF !important; letter-spacing: 2px; }
+h1 { color: #7DF9FF !important; letter-spacing: 2px; text-shadow: 0 0 15px rgba(125, 249, 255, 0.4); }
 h2 { color: #9DECFF !important; }
 h3 { color: #aef !important; font-size: 1em !important; letter-spacing: 1px; }
 
 [data-testid="stSidebar"] {
-    background: #080818 !important;
-    border-right: 1px solid #1a1a3a;
+    background: #050505 !important;
+    border-right: 1px solid #111;
 }
 [data-testid="stSidebar"] h1,
 [data-testid="stSidebar"] h2,
@@ -56,14 +56,14 @@ h3 { color: #aef !important; font-size: 1em !important; letter-spacing: 1px; }
 
 [data-testid="stMetricValue"] {
     color: #7DF9FF !important;
-    font-family: monospace;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 1.3em !important;
     font-weight: bold;
 }
 [data-testid="stMetricLabel"] { color: #556 !important; font-size: 0.72em !important; }
 
 .stTabs [data-baseweb="tab-list"] {
-    background: #0a0a1e; border-radius: 8px; padding: 2px; gap: 2px;
+    background: #050505; border-radius: 8px; padding: 2px; gap: 2px;
 }
 .stTabs [data-baseweb="tab"] {
     color: #556 !important; background: transparent !important;
@@ -77,36 +77,37 @@ h3 { color: #aef !important; font-size: 1em !important; letter-spacing: 1px; }
 
 .stButton > button {
     background: #0d1a2e !important; border: 1px solid #7DF9FF44 !important;
-    color: #7DF9FF !important; border-radius: 6px !important;
-    font-family: monospace !important; font-size: 0.82em !important;
-    transition: all 0.15s;
+    color: #7DF9FF !important; border-radius: 4px !important;
+    font-family: 'JetBrains Mono', monospace !important; font-size: 0.82em !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .stButton > button:hover {
     background: #112244 !important; border-color: #7DF9FF !important;
-    box-shadow: 0 0 8px #7DF9FF44;
+    box-shadow: 0 0 12px rgba(125, 249, 255, 0.3);
 }
 
-.stSelectbox > div > div, .stSlider > div { background: #0a0a1e !important; }
+.stSelectbox > div > div { background: #000 !important; border-color: #1a1a1a !important; }
+.stSlider > div { background: #000 !important; }
 label { color: #778 !important; font-size: 0.78em !important; }
-hr { border-color: #1a1a3a !important; }
+hr { border-color: #1a1a1a !important; }
 
 .kpi-card {
-    background: #08081a; border: 1px solid #1a1a3a; border-radius: 8px;
-    padding: 10px 14px; margin: 3px 0; font-family: monospace; font-size: 11px;
+    background: #050505; border: 1px solid #111; border-radius: 8px;
+    padding: 10px 14px; margin: 3px 0; font-family: 'JetBrains Mono', monospace; font-size: 11px;
 }
 .agent-card {
-    background: #08081a; border-left: 3px solid #7DF9FF;
+    background: #050505; border-left: 3px solid #7DF9FF;
     border-radius: 0 6px 6px 0; padding: 5px 10px; margin: 2px 0;
-    font-family: monospace; font-size: 10.5px; color: #aab;
+    font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #aab;
 }
 .event-line {
-    background: #06060f; border-radius: 4px; padding: 2px 8px;
-    margin: 1px 0; font-family: monospace; font-size: 10px;
+    background: #020202; border-radius: 4px; padding: 2px 8px;
+    margin: 1px 0; font-family: 'JetBrains Mono', monospace; font-size: 10px;
 }
 .section-title {
-    color: #7DF9FF; font-size: 0.85em; letter-spacing: 2.5px;
-    text-transform: uppercase; border-bottom: 1px solid #1a1a3a;
-    padding-bottom: 6px; margin-bottom: 10px;
+    color: #7DF9FF; font-size: 0.85em; letter-spacing: 3px;
+    text-transform: uppercase; border-bottom: 1px solid #1a1a1a;
+    padding-bottom: 8px; margin-bottom: 12px;
     font-weight: bold;
 }
 
@@ -1821,59 +1822,68 @@ elif st.session_state.active_tab == "🧬 v3.0 EMERGENCE":
 
     st.divider()
 
-    # ── ROW 1: Meme Grid (black dark) + Pheromone Grid ────────────────────────
-    mg_col, ph_col = st.columns(2)
+    # ── ROW 1: Cultural Replicator (Spectral Field) + Pheromone Grid ──────────
+    rep_col, ph_col = st.columns([1.2, 0.8])
 
-    with mg_col:
-        st.markdown("<div class='section-title'>🎨 MEME GRID (STIGMERGY) · CULTURAL MEMORY FIELD</div>",
+    with rep_col:
+        st.markdown("<div class='section-title'>🏺 THE CULTURAL REPLICATOR (Level 3) · STIGMERGIC FIELD</div>",
                     unsafe_allow_html=True)
 
         meme_ch_sel = st.radio(
-            "Signal Channel", ["Danger (red)", "Resource (green)", "Sacred (violet)", "Composite RGB"],
+            "Signal Channel", ["Danger (red)", "Resource (green)", "Sacred (violet)", "Spectral Composite"],
             horizontal=True, index=3, key='meme_ch_sel'
         )
 
         meme = W.meme_grid  # (size, size, 3)
 
-        if meme_ch_sel == "Composite RGB":
-            # ── SPECTRAL ADDITIVE BLENDING (30+ Colors) ───────────────────────
+        if meme_ch_sel == "Spectral Composite":
+            # ── PRECISION SPECTRAL ADDITIVE BLENDING (100% PARITY) ─────────────
+            # Implementation: Harmonic mixing of tradition hues with 2-pass Bloom
             mg_img = np.zeros((W.size, W.size, 3), dtype=np.float32)
             mh = getattr(W, 'meme_hue_grid', np.zeros_like(meme[:,:,0]))
             
-            # Channel Base Colors: Danger(Red), Resource(Green), Sacred(Violet)
-            mg_img[:, :, 0] += meme[:, :, 0]   # R
-            mg_img[:, :, 1] += meme[:, :, 1]   # G
-            mg_img[:, :, 2] += meme[:, :, 2] * 0.8  # B-ish
-            mg_img[:, :, 0] += meme[:, :, 2] * 0.5  # V-ish (R+B)
+            # --- 1. HARMONIC MIXING PASS ---
+            for x in range(W.size):
+                for y in range(W.size):
+                    intensity = np.sum(meme[x, y, :])
+                    if intensity > 1e-4:
+                        hue = mh[x, y]
+                        h_rad = (hue / 360.0) * 2 * np.pi
+                        
+                        # Generate procedural mixing components (Neon Resonance)
+                        m_r = 0.55 + 0.45 * np.cos(h_rad)
+                        m_g = 0.55 + 0.45 * np.cos(h_rad - 2*np.pi/3)
+                        m_b = 0.55 + 0.45 * np.cos(h_rad - 4*np.pi/3)
+                        
+                        # Additive mix: Base Channels + Tradition Spectral Overlay
+                        # This ensures 30+ colors via linear combination of tradition hues
+                        mg_img[x, y, 0] += meme[x, y, 0] * 1.2 + intensity * m_r * 0.5
+                        mg_img[x, y, 1] += meme[x, y, 1] * 1.2 + intensity * m_g * 0.5
+                        mg_img[x, y, 2] += meme[x, y, 2] * 1.2 + intensity * m_b * 0.5
             
-            # Tradition Spectral Richness (The 30+ colors)
+            # --- 2. DUAL-SIGMA BLOOM (ORGANIC AURA) ---
+            # Fast two-pass Gaussian blur for Core + Dispersion
+            core_bloom = np.zeros_like(mg_img)
+            disp_bloom = np.zeros_like(mg_img)
             for i in range(3):
-                # Map hue to RGB components manually for speed
-                h_rad = (mh / 360.0) * 2 * np.pi
-                spectral_r = 0.5 + 0.5 * np.cos(h_rad)
-                spectral_g = 0.5 + 0.5 * np.cos(h_rad - 2*np.pi/3)
-                spectral_b = 0.5 + 0.5 * np.cos(h_rad - 4*np.pi/3)
-                
-                # Overlay spectral color weighted by total meme intensity
-                intensity = np.max(meme, axis=2)
-                mg_img[:, :, 0] += intensity * spectral_r * 0.3
-                mg_img[:, :, 1] += intensity * spectral_g * 0.3
-                mg_img[:, :, 2] += intensity * spectral_b * 0.3
-
-            # --- ATMOSPHERIC GLOW (Bloom) ---
-            # Apply slight blur to create the "Aura" effect
-            for i in range(3):
-                mg_img[:, :, i] = nd.gaussian_filter(mg_img[:, :, i], sigma=0.6)
-
-            max_v = mg_img.max()
-            if max_v > 1e-9: mg_img /= max_v
+                core_bloom[:,:,i] = nd.gaussian_filter(mg_img[:,:,i], sigma=0.65)
+                disp_bloom[:,:,i] = nd.gaussian_filter(mg_img[:,:,i], sigma=2.1)
             
-            # Boost vibrancy in dark areas
-            mg_img = np.power(mg_img, 0.45) 
+            # Final additive combination with Linear Dodge logic
+            mg_img = mg_img * 0.75 + core_bloom * 1.2 + disp_bloom * 0.45
+
+            # --- 3. OBSIDIAN TONEMAPPING & GAMMA ---
+            max_val = mg_img.max()
+            if max_val > 1e-8: mg_img /= max_val
+            
+            # Power law to deepen blacks and emphasize the 'glow'
+            mg_img = np.power(mg_img, 0.42) 
             
             fig_meme = go.Figure(go.Image(
                 z=(np.clip(mg_img.transpose(1, 0, 2), 0, 1) * 255).astype(np.uint8),
             ))
+            fig_meme.update_layout(height=480, margin=dict(l=0,r=0,t=0,b=0), dragmode=False)
+            st.plotly_chart(fig_meme, use_container_width=True, key='replicator_live')
 
 
         else:
