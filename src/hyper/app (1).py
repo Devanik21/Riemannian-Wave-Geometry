@@ -1830,19 +1830,20 @@ elif st.session_state.active_tab == "🧬 v3.0 EMERGENCE":
         meme = W.meme_grid  # (size, size, 3)
 
         if meme_ch_sel == "Composite RGB":
+            # ── GE-NESIS STYLE ADDITIVE RGB MIXING ────────────────────────────
             mg_img = np.zeros((W.size, W.size, 3), dtype=np.float32)
-            # Mix channels to create rich CMYK-like vibrancy 
-            # Danger -> Red dominance, Resource -> Green dominance, Sacred -> Blue/Violet dominance
-            mg_img[:, :, 0] = meme[:, :, 0] + 0.3 * meme[:, :, 2]
-            mg_img[:, :, 1] = meme[:, :, 1]
-            mg_img[:, :, 2] = meme[:, :, 2] + 0.2 * meme[:, :, 0]
+            # R=Danger, G=Resource, B=Sacred + additive bleeds for vibrancy
+            mg_img[:, :, 0] = meme[:, :, 0] + 0.2 * meme[:, :, 2] # Danger + Sacred bleed
+            mg_img[:, :, 1] = meme[:, :, 1] + 0.1 * meme[:, :, 0] # Resource + Danger bleed
+            mg_img[:, :, 2] = meme[:, :, 2] + 0.3 * meme[:, :, 1] # Sacred + Resource bleed
 
             max_v = mg_img.max()
             if max_v > 1e-9:
                 mg_img /= max_v
                 
-            # Apply non-linear gamma curve to intensely boost diffusion trails and saturation
-            mg_img = np.power(mg_img, 0.45)
+            # Nonlinear power curve: pulls faint trails out of the void
+            # 0.4 power = intense boost to low-intensity signals
+            mg_img = np.power(mg_img, 0.40)
             
             fig_meme = go.Figure(go.Image(
                 z=(np.clip(mg_img.transpose(1, 0, 2), 0, 1) * 255).astype(np.uint8),
@@ -1860,6 +1861,7 @@ elif st.session_state.active_tab == "🧬 v3.0 EMERGENCE":
                 z=meme[:, :, ch].T,
                 colorscale=ch_cs[meme_ch_sel],
                 showscale=True,
+                zsmooth=False, # KILL THE BLUR: GeNeSIS Crunchy Pixels
                 hovertemplate=f'Meme ({meme_ch_sel}) (%{{x}},%{{y}}) = %{{z:.4f}}<extra></extra>',
             ))
 
@@ -1909,6 +1911,7 @@ elif st.session_state.active_tab == "🧬 v3.0 EMERGENCE":
                 [1.00, '#7DF9FF'],
             ],
             showscale=True,
+            zsmooth=False, # KEEP IT PIXELATED
             hovertemplate='Pheromone (%{x},%{y}) = %{z:.5f}<extra></extra>',
         ))
         if alive_agents:
