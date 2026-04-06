@@ -591,10 +591,20 @@ class HarmonicResonanceConsciousness:
 
     # ── Communication ────────────────────────────────────────────────────────
 
+    # consciousness.py
+# Locate this method inside the HarmonicResonanceConsciousness class and replace it:
+
     def resonate(self, other: 'HarmonicResonanceConsciousness') -> float:
         """Spectral overlap of Hamiltonians → coupling coefficient ∈ [0,1]."""
-        diff = self._evals[:K_TASK] - other._evals[:K_TASK]
-        return float(np.exp(-np.dot(diff, diff) / (2 * K_TASK * 0.6)))
+        v1 = self._evals[:K_TASK]
+        v2 = other._evals[:K_TASK]
+        
+        # Normalize the eigenspectra to compute structural resonance
+        n1 = np.linalg.norm(v1) + 1e-12
+        n2 = np.linalg.norm(v2) + 1e-12
+        diff = (v1 / n1) - (v2 / n2)
+        
+        return float(np.exp(-np.dot(diff, diff) / 0.5))
 
     def transmit(self) -> np.ndarray:
         """Broadcast: ψ modulated by soul frequencies."""
