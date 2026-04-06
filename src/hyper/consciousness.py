@@ -789,12 +789,20 @@ class HarmonicResonanceConsciousness:
         }
         return max(scores, key=scores.get)
 
+    # consciousness.py
+# Locate this method inside the HarmonicResonanceConsciousness class and replace it:
+
     def spectral_rgb(self) -> Tuple[int, int, int]:
-        """RGB color identity from eigenspectrum — unique per soul."""
+        """Mysterious glowing RGB identity from eigenspectrum — unique per soul."""
         ev = self._evals
-        r  = int((np.sin(ev[0] * 0.7) + 1) / 2 * 200 + 55)
-        g  = int((np.sin(ev[min(5, K_DIM-1)] * 1.1) + 1) / 2 * 200 + 55)
-        b  = int((np.sin(ev[min(11, K_DIM-1)] * 1.6) + 1) / 2 * 200 + 55)
+        
+        # Elevate the baseline to 120 to prevent dark colors.
+        # The remaining 135 is modulated by the eigenfrequencies for unique, 
+        # highly-visible bioluminescent signatures.
+        r = int((np.sin(ev[0] * 0.7) + 1) / 2 * 135) + 120
+        g = int((np.sin(ev[1] * 0.8) + 1) / 2 * 135) + 120
+        b = int((np.sin(ev[2] * 0.9) + 1) / 2 * 135) + 120
+        
         return (r, g, b)
 
     def psi_magnitude_profile(self) -> List[float]:
