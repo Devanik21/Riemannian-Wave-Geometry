@@ -426,7 +426,7 @@ if st.session_state.active_tab == "🌍 WORLD MAP":
                 mode='markers',
                 marker=dict(size=sizes, color=df_ag['color'].tolist(),
                             opacity=0.92,
-                            line=dict(width=0.6, color='rgba(255,255,255,0.15)')),
+                            line=dict(width=1.5, color='rgba(125, 249, 255, 0.6)')), # Updated cyan halo
                 text=hover_texts,
                 hovertemplate='%{text}<extra></extra>',
                 name='Agents',
