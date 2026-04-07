@@ -84,7 +84,7 @@ class BioHyperAgent:
     INVENT_COST       = 0.15
     BUILD_COST        = 0.05
     COMMUNICATE_COST  = 0.0000001
-    META_INVENT_COST  = 0.10
+    META_INVENT_COST  = 0.06
     COMPOSE_COST      = 0.05
     TRADE_COST        = 0.005
     PUNISH_COST       = 0.08
