@@ -401,18 +401,30 @@ class World:
     # ══════════════════════════════════════════════════════════════════════════
 
     # world.py
+    # world.py
+# Locate the query_oracle method inside the World class and replace it entirely:
+
     def query_oracle(self, vector_21: np.ndarray,
                      local_signal_29: np.ndarray) -> np.ndarray:
         """
-        Query the frozen PhysicsOracle.
-        Input:  21D agent vector + 29D local signal = 50D
+        Query the frozen PhysicsOracle with clamped inputs to prevent
+        lethal radiation at god-like energy levels.
         """
         with torch.no_grad():
-            v = torch.tensor(vector_21[:21], dtype=torch.float32).unsqueeze(0)
-            s = torch.tensor(local_signal_29[:29], dtype=torch.float32).unsqueeze(0) # UPDATED: 16 -> 29
+            # Clamp the Oracle's "eyes" to [-15.0, 15.0] so the NN remains stable
+            # while the actual agent energy and world resources remain infinite!
+            v_safe = np.clip(vector_21[:21], -15.0, 15.0)
+            s_safe = np.clip(local_signal_29[:29], -15.0, 15.0)
+
+            v = torch.tensor(v_safe, dtype=torch.float32).unsqueeze(0)
+            s = torch.tensor(s_safe, dtype=torch.float32).unsqueeze(0)
+            
             inp = torch.cat([v, s], dim=1)
-            effects = self.oracle(inp)[0]
-        return effects.numpy()
+            effects = self.oracle(inp)[0].numpy()
+
+        # Clamp the Oracle's output effects to prevent instant death 
+        # (capping the max drain_factor / negative energy_flux to safe levels)
+        return np.clip(effects, -2.0, 2.0)
     # ══════════════════════════════════════════════════════════════════════════
     # NEW v3.0: PHEROMONE GRID (8-channel stigmergy)
     # ══════════════════════════════════════════════════════════════════════════
