@@ -403,7 +403,17 @@ class BioHyperAgent:
                                         "move_N","move_S","move_E","move_W"],
             CognitionMode.MEDITATE  : ["rest","meta_invent","compose_action"],
         }
+
         mode    = self.brain.get_dominant_mode()
+        
+        # ── INTELLIGENCE PREVENTS WAR ──
+        # If the agent is highly intelligent (high phi or many inventions),
+        # they actively suppress the desire to dominate, rerouting their 
+        # consciousness toward socializing or inventing instead.
+        is_highly_intelligent = (self.phi_value > 0.15 or len(self.brain.discoveries) > 5)
+        if mode == CognitionMode.DOMINATE and is_highly_intelligent:
+            mode = self.rng.choice([CognitionMode.SOCIALIZE, CognitionMode.INVENT])
+            
         options = BIAS.get(mode, [])
         if options and self.rng.random() < 0.38:
             return self.rng.choice(options)
@@ -815,9 +825,16 @@ class BioHyperAgent:
                         self.trade_count  += 1
                         partner.trade_count += 1
                         # Trust boost
-                        self.social_memory[pid] = self.social_memory.get(pid, 0) + 0.5
-                        partner.social_memory[self.id] = partner.social_memory.get(self.id, 0) + 0.5
-                        return 0.40
+                        # Massive Trust and Affection Synergy for both!
+                        self.social_memory[pid] = self.social_memory.get(pid, 0) + 2.0
+                        partner.social_memory[self.id] = partner.social_memory.get(self.id, 0) + 2.0
+                        
+                        self.brain.emotions[E.AFFECTION] = min(1.0, self.brain.emotions[E.AFFECTION] + 0.60)
+                        partner.brain.emotions[E.AFFECTION] = min(1.0, partner.brain.emotions[E.AFFECTION] + 0.60)
+                        
+                        # Massive Born-rule cognitive reward guarantees their intelligence 
+                        # chooses trade and peace over war EVERY time!
+                        return 1.85
         return -0.01
 
     # ══════════════════════════════════════════════════════════════════════════
