@@ -125,8 +125,8 @@ class CivilizationManager:
       5. Tribe power recalculation
     """
 
-    MAX_TRIBE_SIZE   = 28
-    SCHISM_THRESHOLD = 4.0   # epistemic divergence threshold
+    MAX_TRIBE_SIZE   = 64
+    SCHISM_THRESHOLD = 8.0   # epistemic divergence threshold
 
     def __init__(self, world_size: int = 60):
         self.tribes      : Dict[str, Tribe] = {}
