@@ -54,11 +54,16 @@ from consciousness import (
 
 # ── Physics constants ────────────────────────────────────────────────────────
 _BASE_FREQS = np.array([
-    1.0,  2.0,  3.0,  5.0,  7.0,  11.0,  13.0,  17.0,
-    19.0, 23.0, 29.0, 31.0, 37.0, 41.0,  43.0,  47.0,
-    53.0, 59.0, 61.0, 67.0, 71.0, 73.0,  79.0,  83.0,
-    89.0, 97.0, 101.0,103.0,107.0,109.0, 113.0, 127.0,
-])  # first 32 primes
+    2,   3,   5,   7,   11,  13,  17,  19,   # 1-8
+    23,  29,  31,  37,  41,  43,  47,  53,   # 9-16
+    59,  61,  67,  71,  73,  79,  83,  89,   # 17-24
+    97,  101, 103, 107, 109, 113, 127, 131,  # 25-32
+    137, 139, 149, 151, 157, 163, 167, 173,  # 33-40 (New Meta-Layers)
+    179, 181, 191, 193, 197, 199, 211, 223,  # 41-48
+    227, 229, 233, 239, 241, 251, 257, 263,  # 49-56
+    269, 271, 277, 281, 283, 293, 307, 311   # 57-64
+]) / 100.0  # Normalised to keep the Schrödinger evolution stable
+
 
 
 class BioHyperAgent:
@@ -78,16 +83,16 @@ class BioHyperAgent:
     # ── Life constants ───────────────────────────────────────────────────────
     MAX_AGE           = -1
     BASE_METABOLISM   = 0.001
-    MOVE_COST         = 0.002
-    ATTACK_COST       = 0.05
+    MOVE_COST         = 0.0005
+    ATTACK_COST       = 0.20
     REPRODUCE_COST    = 0.35
     INVENT_COST       = 0.15
     BUILD_COST        = 0.05
     COMMUNICATE_COST  = 0.0000001
     META_INVENT_COST  = 0.06
-    COMPOSE_COST      = 0.05
+    COMPOSE_COST      = 0.02
     TRADE_COST        = 0.005
-    PUNISH_COST       = 0.08
+    PUNISH_COST       = 0.10
 
     def __init__(
         self,
