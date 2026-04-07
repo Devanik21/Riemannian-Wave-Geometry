@@ -230,6 +230,8 @@ class World:
         # ══════════════════════════════════════════════════════════════════
         self.meme_grid = np.zeros((size, size, 8), dtype=np.float32)
 
+        self.meme_hue_grid = np.zeros((size, size), dtype=np.float32)
+
 
         # ══════════════════════════════════════════════════════════════════
         # NEW v3.0: Seasonal Dynamics
