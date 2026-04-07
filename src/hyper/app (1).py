@@ -197,7 +197,7 @@ with st.sidebar:
     st.markdown("#  HyPER AgEnT")
     st.markdown(
         "<div style='color:#334;font-size:0.72em;letter-spacing:1px;'>"
-        "SPECTRAL LIFE · 96 HYPERAGENTS · K=32<br>"
+        "SPECTRAL LIFE · 96 HYPERAGENTS · K=64<br>"
         "HRC + Metacognition · Zero LLM"
         "</div>", unsafe_allow_html=True
     )
@@ -2353,7 +2353,7 @@ st.divider()
 st.markdown(
     "<div style='text-align:center;font-family:monospace;font-size:10px;"
     "color:#151530;padding:8px'>"
-    "HyPER AgEnT v3.0 · HyperAgent Edition · K_DIM=32 · 96 Agents · 30 GeNeSIS Features<br>"
+    "HyPER AgEnT v3.0 · HyperAgent Edition · K_DIM=64 · 96 Agents · 30 GeNeSIS Features<br>"
     "Metacognitive Self-Modification · Stigmergy · Pheromones · Gödel-Encoded Inventions · Zero LLM<br>"
     "Invented by Devanik &amp; Claude (Xylia) · 2025–2026"
     "</div>",
