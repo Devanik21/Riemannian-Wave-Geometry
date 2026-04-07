@@ -323,8 +323,8 @@ class World:
         # ── Knowledge field diffusion (every tick) ────────────────────────
         self._diffuse_knowledge_field()
 
-        # ── Pheromone diffusion (every tick) ──────────────────────────────
-        self._diffuse_pheromones()
+        if self.step_count % 3 == 0:
+            self._diffuse_pheromones()
 
         # ── Idea interference (every tick) ────────────────────────────────
         self._compute_interference()
@@ -435,7 +435,7 @@ class World:
             + np.roll(g, 1, 0) + np.roll(g, -1, 0)
             + np.roll(g, 1, 1) + np.roll(g, -1, 1)
         ) / 5.0
-        self.pheromone_grid = diffused * 0.95  # 5% evaporation
+        self.pheromone_grid = diffused * 0.85  # 5% evaporation
 
     # ══════════════════════════════════════════════════════════════════════════
     # NEW v3.0: MEME GRID (3-channel stigmergic cultural memory)
