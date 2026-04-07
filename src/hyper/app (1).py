@@ -280,7 +280,7 @@ if step50: run_steps(50)
 if auto:
     run_steps(st.session_state.speed)
     # Only refresh the UI every 5 ticks to save massive rendering overhead
-    if W.step_count % 10 == 0:
+    if W.step_count % 5 == 0:
         st.rerun()
     else:
         time.sleep(0.01)
