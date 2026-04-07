@@ -81,7 +81,7 @@ class BioHyperAgent:
     """
 
     # ── Life constants ───────────────────────────────────────────────────────
-    MAX_AGE           = -1
+    MAX_AGE           = 999999999
     BASE_METABOLISM   = 0.001
     MOVE_COST         = 0.0005
     ATTACK_COST       = 0.20
