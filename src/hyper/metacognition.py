@@ -22,12 +22,12 @@ import numpy as np
 from typing import Optional, Dict, List, Tuple, Set
 
 # ── Global constants (shared across all modules) ─────────────────────────────
-K_DIM       = 32        # Total Hilbert space dimension per agent
-K_TASK      = 16        # Dims 0–15: task-level cognition
-K_META      = 16        # Dims 16–31: meta-cognition (learning about learning)
-META_DT     = 0.04      # Meta-level Schrödinger time step (slower than task)
-GODEL_BASE  = 17        # Base for Gödel encoding (prime, > number of primitives)
-MAX_PROGRAM_LEN = 8     # Maximum length of a behavioral program
+K_DIM       = 64        # Total Hilbert space dimension per agent
+K_TASK      = 24        # Dims 0–15: task-level cognition
+K_META      = 40        # Dims 16–31: meta-cognition (learning about learning)
+META_DT     = 0.08      # Meta-level Schrödinger time step (slower than task)
+GODEL_BASE  = 19        # Base for Gödel encoding (prime, > number of primitives)
+MAX_PROGRAM_LEN = 12     # Maximum length of a behavioral program
 
 
 # ══════════════════════════════════════════════════════════════════════════════
