@@ -337,15 +337,25 @@ class CivilizationMemory:
         self.count = 0
 
     def store(self, psi_encoded: np.ndarray) -> None:
-        """Imprint a discovery's encoding into the memory matrix."""
+        """Imprint a discovery's encoding into the memory matrix with Epistemic Evaporation."""
         v = np.zeros(self.dim, dtype=complex)
         n = min(len(psi_encoded), self.dim)
         v[:n] = psi_encoded[:n]
+        
         norm = np.linalg.norm(v)
         if norm > 1e-12:
             v /= norm
+            
+        # ── 1. EPISTEMIC EVAPORATION ──
+        # Decay the existing matrix by 5% to prevent 64D saturation,
+        # allowing new Breakthroughs to mathematically spike!
+        self.M = self.M * 0.95  
+        
+        # ── 2. IMPRINT NEW KNOWLEDGE ──
         self.M += self.eta * np.outer(v, v.conj())
-        self.M  = (self.M + self.M.conj().T) / 2
+        
+        # Ensure it remains perfectly Hermitian
+        self.M = (self.M + self.M.conj().T) / 2
         self.count += 1
 
     def query(self, query_psi: np.ndarray) -> float:
