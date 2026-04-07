@@ -810,31 +810,37 @@ class BioHyperAgent:
 
         self.energy -= self.TRADE_COST
 
+        # agents.py
+# Locate the _trade() method and replace the token-checking loop with this:
+
         for pid in bonded:
             partner = all_agents.get(pid)
             if not partner or not partner.alive:
                 continue
-            # Look for complementary tokens to trade
+                
+            # ── THE INFORMATION ECONOMY ──
+            # Advanced civilizations trade data, trust, and culture, not just physical goods.
+            # If they are bonded, the interaction is automatically successful.
+            
+            # Optional physical token exchange if they happen to have them
             for i in range(3):
-                for j in range(3):
-                    if i != j and self.inventory[i] > 0 and partner.inventory[j] > 0:
-                        self.inventory[i] -= 1
-                        self.inventory[j] += 1
-                        partner.inventory[j] -= 1
-                        partner.inventory[i] += 1
-                        self.trade_count  += 1
-                        partner.trade_count += 1
-                        # Trust boost
-                        # Massive Trust and Affection Synergy for both!
-                        self.social_memory[pid] = self.social_memory.get(pid, 0) + 2.0
-                        partner.social_memory[self.id] = partner.social_memory.get(self.id, 0) + 2.0
-                        
-                        self.brain.emotions[E.AFFECTION] = min(1.0, self.brain.emotions[E.AFFECTION] + 0.60)
-                        partner.brain.emotions[E.AFFECTION] = min(1.0, partner.brain.emotions[E.AFFECTION] + 0.60)
-                        
-                        # Massive Born-rule cognitive reward guarantees their intelligence 
-                        # chooses trade and peace over war EVERY time!
-                        return 1.85
+                if self.inventory[i] > 0 and partner.inventory[i] < 5:
+                    self.inventory[i] -= 1
+                    partner.inventory[i] += 1
+                    break
+                    
+            self.trade_count  += 1
+            partner.trade_count += 1
+            
+            # Massive Trust and Affection Synergy for both!
+            self.social_memory[pid] = self.social_memory.get(pid, 0) + 2.0
+            partner.social_memory[self.id] = partner.social_memory.get(self.id, 0) + 2.0
+            
+            self.brain.emotions[E.AFFECTION] = min(1.0, self.brain.emotions[E.AFFECTION] + 0.60)
+            partner.brain.emotions[E.AFFECTION] = min(1.0, partner.brain.emotions[E.AFFECTION] + 0.60)
+            
+            return 1.85  
+            
         return -0.01
 
     # ══════════════════════════════════════════════════════════════════════════
