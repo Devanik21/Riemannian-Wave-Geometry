@@ -76,17 +76,17 @@ class BioHyperAgent:
     """
 
     # ── Life constants ───────────────────────────────────────────────────────
-    MAX_AGE           = 25000
-    BASE_METABOLISM   = 0.005
-    MOVE_COST         = 0.001
+    MAX_AGE           = -1
+    BASE_METABOLISM   = 0.001
+    MOVE_COST         = 0.002
     ATTACK_COST       = 0.05
-    REPRODUCE_COST    = 0.15
-    INVENT_COST       = 0.05
+    REPRODUCE_COST    = 0.35
+    INVENT_COST       = 0.15
     BUILD_COST        = 0.05
-    COMMUNICATE_COST  = 0.002
+    COMMUNICATE_COST  = 0.0000001
     META_INVENT_COST  = 0.10
     COMPOSE_COST      = 0.05
-    TRADE_COST        = 0.02
+    TRADE_COST        = 0.005
     PUNISH_COST       = 0.08
 
     def __init__(
