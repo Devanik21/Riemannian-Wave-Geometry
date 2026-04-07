@@ -330,7 +330,12 @@ class HarmonicResonanceConsciousness:
 
         self.H = self.H + dH
         self.H = (self.H + self.H.conj().T) / 2
-        self._recache()
+        
+        # --- LAZY RECACHING (Massive Speedup) ---
+        # Only run the heavy O(N^3) matrix math if the reward was highly 
+        # significant, or routinely every 4 ticks to maintain stability.
+        if abs(reward) > 0.25 or self.age_ticks % 5 == 0:
+            self._recache()
 
         # Emotion update
         if reward > 0:
