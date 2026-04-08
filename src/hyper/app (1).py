@@ -21,6 +21,9 @@ import numpy as np
 import pandas as pd
 import time
 import scipy.ndimage as nd
+import zipfile
+import io
+import json
 
 
 # ── Page must be very first Streamlit call ────────────────────────────────────
@@ -116,6 +119,31 @@ hr { border-color: #1a1a1a !important; }
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# NEW v3.0: QUANTUM JSON TRANSLATOR
+# ══════════════════════════════════════════════════════════════════════════════
+class QuantumEncoder(json.JSONEncoder):
+    """Flattens NumPy and Complex math for JSON preservation."""
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, complex):
+            return {"__complex__": True, "real": obj.real, "imag": obj.imag}
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, set):
+            return list(obj)
+        return super().default(obj)
+
+def quantum_decoder(dct):
+    """Rebuilds Complex math from JSON text."""
+    if "__complex__" in dct:
+        return complex(dct["real"], dct["imag"])
+    return dct
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # SIMULATION BOOTSTRAP
 # ══════════════════════════════════════════════════════════════════════════════
 @st.cache_resource
@@ -201,6 +229,53 @@ with st.sidebar:
         "HRC + Metacognition · Zero LLM"
         "</div>", unsafe_allow_html=True
     )
+
+    st.divider()
+    st.markdown("### 💾 JSON Cryo-Chamber")
+    
+    # ── 1. UPLOAD TO RESUME ──
+    uploaded_zip = st.sidebar.file_uploader("Upload Timeline (.zip)", type="zip", key='cryo_up')
+    if uploaded_zip is not None:
+        try:
+            with zipfile.ZipFile(uploaded_zip) as z:
+                with z.open('universe_state.json') as f:
+                    json_data = f.read().decode('utf-8')
+                    restored_state = json.loads(json_data, object_hook=quantum_decoder)
+                    
+                    st.session_state.engine.thaw_universe(
+                        restored_state, 
+                        st.session_state.world, 
+                        st.session_state.civ
+                    )
+                    st.session_state.step_count = restored_state['world']['step']
+                    st.sidebar.success(f"Timeline Restored! 🟢")
+                    time.sleep(1)
+                    st.rerun()
+        except Exception as e:
+            st.sidebar.error(f"Failed to restore timeline: {e}")
+
+    # ── 2. FREEZE TO DOWNLOAD ──
+    if st.sidebar.button("📦 Freeze & Backup (JSON.ZIP)", use_container_width=True):
+        with st.spinner("Freezing Quantum Matrices..."):
+            try:
+                state_dict = st.session_state.engine.freeze_universe(
+                    st.session_state.civ, st.session_state.world
+                )
+                json_str = json.dumps(state_dict, cls=QuantumEncoder, indent=2)
+                zip_buffer = io.BytesIO()
+                with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+                    zip_file.writestr("universe_state.json", json_str)
+                
+                st.sidebar.download_button(
+                    label="⬇️ Download Universe.zip",
+                    data=zip_buffer.getvalue(),
+                    file_name=f"hyperagent_universe_tick{W.step_count}.zip",
+                    mime="application/zip",
+                    use_container_width=True,
+                )
+            except Exception as e:
+                st.sidebar.error(f"Failed to freeze: {e}")
+              
     st.divider()
 
     c1, c2, c3 = st.columns(3)
@@ -2326,30 +2401,7 @@ elif st.session_state.active_tab == "🧬 v3.0 EMERGENCE":
             f"</div>",
             unsafe_allow_html=True
         )
-        if st.button("🧬 Export DNA (JSON)", use_container_width=True, key='dna_export'):
-            import json
-            dna = EN.export_simulation_dna(civ=C, world=W)
-            def _np_fix(obj):
-                if isinstance(obj, np.ndarray):
-                    return obj.tolist()
-                if isinstance(obj, (np.integer,)):
-                    return int(obj)
-                if isinstance(obj, (np.floating,)):
-                    return float(obj)
-                if isinstance(obj, dict):
-                    return {k: _np_fix(v) for k, v in obj.items()}
-                if isinstance(obj, list):
-                    return [_np_fix(x) for x in obj]
-                return obj
-            dna_clean = _np_fix(dna)
-            st.download_button(
-                label="⬇ Download DNA.json",
-                data=json.dumps(dna_clean, indent=2),
-                file_name=f"hyperagent_dna_tick{W.step_count}.json",
-                mime="application/json",
-                use_container_width=True,
-                key='dna_download',
-            )
+        
 
 
 # ══════════════════════════════════════════════════════════════════════════════
