@@ -24,7 +24,7 @@ import scipy.ndimage as nd
 import zipfile
 import io
 import json
-
+import lzma
 
 # ── Page must be very first Streamlit call ────────────────────────────────────
 st.set_page_config(
@@ -121,23 +121,38 @@ hr { border-color: #1a1a1a !important; }
 # ══════════════════════════════════════════════════════════════════════════════
 # NEW v3.0: QUANTUM JSON TRANSLATOR
 # ══════════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════════════
+# NEW v3.0: HIGH-EFFICIENCY QUANTUM JSON TRANSLATOR
+# ══════════════════════════════════════════════════════════════════════════════
 class QuantumEncoder(json.JSONEncoder):
-    """Flattens NumPy and Complex math for JSON preservation."""
+    """Flattens NumPy and Complex math for MASSIVE JSON compression."""
     def default(self, obj):
         if isinstance(obj, np.ndarray):
+            # THE FIX: Encode entire massive matrices as two flat arrays!
+            # This deletes millions of redundant dictionary keys from the JSON.
+            if np.iscomplexobj(obj):
+                return {
+                    "__complex_ndarray__": True, 
+                    "real": obj.real.tolist(), 
+                    "imag": obj.imag.tolist()
+                }
             return obj.tolist()
+            
         if isinstance(obj, complex):
             return {"__complex__": True, "real": obj.real, "imag": obj.imag}
         if isinstance(obj, np.integer):
             return int(obj)
         if isinstance(obj, np.floating):
             return float(obj)
-        if isinstance(obj, set):
+        if isinstance(obj, (set, frozenset)):
             return list(obj)
         return super().default(obj)
 
 def quantum_decoder(dct):
-    """Rebuilds Complex math from JSON text."""
+    """Rebuilds 100% perfect math from JSON text."""
+    if "__complex_ndarray__" in dct:
+        # Instantly reconstructs the 64D quantum matrix perfectly!
+        return np.array(dct["real"]) + 1j * np.array(dct["imag"])
     if "__complex__" in dct:
         return complex(dct["real"], dct["imag"])
     return dct
@@ -267,7 +282,7 @@ with st.sidebar:
                 )
                 json_str = json.dumps(state_dict, cls=QuantumEncoder, indent=2)
                 zip_buffer = io.BytesIO()
-                with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+                with zipfile.ZipFile(zip_buffer, "a", compression=zipfile.ZIP_LZMA) as zip_file:
                     zip_file.writestr("universe_state.json", json_str)
                 
                 st.sidebar.download_button(
