@@ -361,10 +361,28 @@ class CivilizationManager:
                     if tribe and tribe.tribal_memory:
                         dummy_mem = tribe.tribal_memory
 
-                    # Calculate how mathematically shocking this new idea is!
+
                     novelty, is_breakthrough = self.novelty_scorer.score(
                         godel, program, dummy_mem, psi_enc
                     )
+
+                    # ── 2. THE SINGULARITY OVERRIDE
+                    # In a hyper-advanced civilization, rolling averages squash relative spikes.
+                    # We implement an Absolute Genius Threshold. Any idea scoring > 0.55 
+                    # in the late game is mathematically profound!
+                    if novelty > 0.55 and len(self.tech.nodes) > 15:
+                        is_breakthrough = True
+                        # Ensure the breakthrough is explicitly recorded for the UI!
+                        if not hasattr(self.novelty_scorer, 'breakthroughs'):
+                            self.novelty_scorer.breakthroughs = []
+                        
+                        # Add it to the leaderboard
+                        self.novelty_scorer.breakthroughs.append({
+                            'name': name,
+                            'novelty': float(novelty),
+                            'inventor': agent.id
+                        })
+
 
                     # ── 2. STORE IN MEMORY SECOND ──
                     # Now that it has been safely scored, the civilization absorbs it.
