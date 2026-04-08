@@ -234,25 +234,29 @@ with st.sidebar:
     st.markdown("### 💾 JSON Cryo-Chamber")
     
     # ── 1. UPLOAD TO RESUME ──
+    # ── 1. UPLOAD TO RESUME ──
     uploaded_zip = st.sidebar.file_uploader("Upload Timeline (.zip)", type="zip", key='cryo_up')
+    
     if uploaded_zip is not None:
-        try:
-            with zipfile.ZipFile(uploaded_zip) as z:
-                with z.open('universe_state.json') as f:
-                    json_data = f.read().decode('utf-8')
-                    restored_state = json.loads(json_data, object_hook=quantum_decoder)
-                    
-                    st.session_state.engine.thaw_universe(
-                        restored_state, 
-                        st.session_state.world, 
-                        st.session_state.civ
-                    )
-                    st.session_state.step_count = restored_state['world']['step']
-                    st.sidebar.success(f"Timeline Restored! 🟢")
-                    time.sleep(1)
-                    st.rerun()
-        except Exception as e:
-            st.sidebar.error(f"Failed to restore timeline: {e}")
+        # ── THE FIX: Require a button click to break the infinite loop! ──
+        if st.sidebar.button("⚙️ Confirm Restore Universe", use_container_width=True):
+            try:
+                with zipfile.ZipFile(uploaded_zip) as z:
+                    with z.open('universe_state.json') as f:
+                        json_data = f.read().decode('utf-8')
+                        restored_state = json.loads(json_data, object_hook=quantum_decoder)
+                        
+                        st.session_state.engine.thaw_universe(
+                            restored_state, 
+                            st.session_state.world, 
+                            st.session_state.civ
+                        )
+                        st.session_state.step_count = restored_state['world']['step']
+                        st.sidebar.success(f"Timeline Restored! 🟢")
+                        time.sleep(0.5)
+                        st.rerun()
+            except Exception as e:
+                st.sidebar.error(f"Failed to restore timeline: {e}")
 
     # ── 2. FREEZE TO DOWNLOAD ──
     if st.sidebar.button("📦 Freeze & Backup (JSON.ZIP)", use_container_width=True):
