@@ -252,35 +252,32 @@ class EvolutionEngine:
     def _check_cultural_ratchet(self):
         """
         Cultural Ratchet: verify that behavioral patterns persist across
-        generations — autocorrelation between gen N and gen N+5.
+        generations without requiring agents to die (Immortality-Safe).
         """
-        alive = [a for a in self.agents.values() if a.alive]
-        if not alive:
+        alive_agents = [a for a in self.agents.values() if a.alive]
+        if not alive_agents:
             return
 
-        # Compute average psi amplitude profile for current generation
-        gen = self.generation
-        profiles = [np.abs(a.brain.psi) for a in alive]
-        avg_profile = np.mean(profiles, axis=0)
-        self.gen_behavior_archive[gen] = avg_profile
-
-        # Clean old entries
-        if len(self.gen_behavior_archive) > 30:
-            oldest = min(self.gen_behavior_archive.keys())
-            del self.gen_behavior_archive[oldest]
-
-        # Check autocorrelation at lag=5 generations
-        gen_keys = sorted(self.gen_behavior_archive.keys())
-        if len(gen_keys) < 5:
-            return
-
-        current = self.gen_behavior_archive[gen_keys[-1]]
-        lagged  = self.gen_behavior_archive[gen_keys[-5]]
-
-        if np.std(current) > 1e-9 and np.std(lagged) > 1e-9:
-            corr = float(np.corrcoef(current, lagged)[0, 1])
-            self.cultural_continuity = corr if np.isfinite(corr) else 0.0
-            self.tradition_verified = corr > 0.7
+        gen0 = [a for a in alive_agents if a.generation == 0]
+        genN = [a for a in alive_agents if a.generation > 0]
+        
+        if len(gen0) > 4 and len(genN) > 4:
+            # Extract the average cognitive mode biases (Culture) of Founders vs Children
+            mode_0 = np.mean([[a.action_counts.get(m, 0) for m in ["eat", "trade", "invent", "move_N"]] for a in gen0], axis=0)
+            mode_N = np.mean([[a.action_counts.get(m, 0) for m in ["eat", "trade", "invent", "move_N"]] for a in genN], axis=0)
+            
+            # Prevent zero-variance division errors
+            if np.std(mode_0) > 0 and np.std(mode_N) > 0:
+                # Calculate Pearson correlation r
+                self.cultural_continuity = float(np.corrcoef(mode_0, mode_N)[0, 1])
+                # Tradition is verified if correlation is highly positive!
+                self.tradition_verified = bool(self.cultural_continuity > 0.65)
+            else:
+                self.cultural_continuity = 0.0
+                self.tradition_verified = False
+        else:
+            self.cultural_continuity = 0.0
+            self.tradition_verified = False
 
     # ══════════════════════════════════════════════════════════════════════════
     # NEW v3.0: BEHAVIORAL CLUSTERING (KMeans-style archetype assignment)
