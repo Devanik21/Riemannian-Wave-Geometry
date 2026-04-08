@@ -550,8 +550,14 @@ class PhylogeneticTracker:
 
         recent_std = np.std(recent)
         older_std  = np.std(older) + 1e-6
+        
+        recent_mean = np.mean(recent)
+        older_mean  = np.mean(older) + 1e-6
 
-        if recent_std > 3.0 * older_std and len(recent) >= 10:
+        # ── CAMBRIAN TRIGGER (Updated for Hyper-Genius Normalization) ──
+        # Because they invent so fast, we lower the threshold to 1.5x std deviation, 
+        # OR we trigger a breakthrough if the absolute average novelty jumps by 1.25x!
+        if (recent_std > 1.5 * older_std or recent_mean > 1.25 * older_mean) and len(recent) >= 10:
             event = {
                 'step': step,
                 'recent_std': round(float(recent_std), 4),
@@ -562,6 +568,7 @@ class PhylogeneticTracker:
             self.cambrian_events.append(event)
             return event
         return None
+
 
     def get_stats(self) -> dict:
         return {
