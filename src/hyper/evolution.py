@@ -192,7 +192,7 @@ class EvolutionEngine:
             self._update_meta_fitness()
 
         # Cultural ratchet verification (every 50 ticks)
-        if world.step_count % 50 == 0:
+        if world.step_count % 16 == 0:
             self._check_cultural_ratchet()
 
         # Behavioral clustering (every 15 ticks)
