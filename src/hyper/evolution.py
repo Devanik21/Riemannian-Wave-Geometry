@@ -316,43 +316,245 @@ class EvolutionEngine:
     # NEW v3.0: DNA PRESERVATION EXPORT
     # ══════════════════════════════════════════════════════════════════════════
 
-    def export_simulation_dna(self, civ: CivilizationManager = None,
-                               world: World = None) -> dict:
-        """
-        Export complete simulation state for replay / Nobel Committee showcase.
-        Serializes all metrics, agent snapshots, and world state.
-        """
-        alive = [a for a in self.agents.values() if a.alive]
+    # ══════════════════════════════════════════════════════════════════════════
+    # NEW v3.0: 100% UNIVERSE FREEZE & THAW (JSON SAFE)
+    # ══════════════════════════════════════════════════════════════════════════
 
-        dna = {
-            'timestamp'      : datetime.datetime.now().isoformat(),
-            'version'        : 'v3.0',
-            'total_born'     : self.total_born,
-            'total_died'     : self.total_died,
-            'generation'     : self.generation,
-            'pop_history'    : self.pop_history[-300:],
-            'energy_history' : self.energy_history[-300:],
-            'inv_history'    : self.inv_history[-300:],
-            'meta_inv_history': self.meta_inv_history[-300:],
-            'novelty_history': self.novelty_history[-300:],
+    def freeze_universe(self, civ: CivilizationManager, world: World) -> dict:
+        """Captures 100% of the mathematical state for absolute JSON preservation."""
+        engine_state = {
+            'total_born': self.total_born,
+            'total_died': self.total_died,
+            'generation': self.generation,
+            'pop_history': self.pop_history,
+            'energy_history': self.energy_history,
+            'inv_history': self.inv_history,
+            'meta_inv_history': self.meta_inv_history,
+            'novelty_history': self.novelty_history,
             'cultural_continuity': self.cultural_continuity,
             'tradition_verified': self.tradition_verified,
+            'archetypes': self.archetypes,
             'archetype_counts': self.archetype_counts,
-            'n_clades'       : len(self.phylo.clades),
-            'n_cambrian'     : len(self.phylo.cambrian_events),
-            'agent_snapshots': [a.to_dict() for a in alive[:50]],
+            'lineage': self.lineage,
+            'phylo_clades': {k: list(v) for k, v in self.phylo.clades.items()},
+            'phylo_history': self.phylo.clade_history,
+            'phylo_cambrian': self.phylo.cambrian_events,
+            'gen_behavior_archive': {str(k): v for k, v in self.gen_behavior_archive.items()}
         }
 
-        if civ:
-            dna['civ_stats'] = civ.get_stats()
-            dna['tech_tree_size'] = len(civ.tech.nodes)
-            dna['tribe_count'] = len(civ.tribes)
-            dna['breakthroughs'] = len(civ.novelty_scorer.breakthroughs)
+        # Dict keys in JSON must be strings, so we convert tuple coordinates (x,y) to "x,y"
+        world_state = {
+            'step': world.step_count,
+            'resources': world.resources,
+            'knowledge_field': world.knowledge_field,
+            'pheromone_grid': world.pheromone_grid,
+            'meme_grid': world.meme_grid,
+            'meme_hue_grid': getattr(world, 'meme_hue_grid', np.zeros((world.size, world.size))),
+            'season': world.season,
+            'season_timer': world.season_timer,
+            'env_phase': world.env_phase,
+            'weather_amplitude': world.weather_amplitude,
+            'bonds': [list(b) for b in world.bonds],
+            'kuramoto_order': world.kuramoto_order_parameter,
+            'event_log': getattr(world, '_event_log', []),
+            'artifacts': {f"{k[0]},{k[1]}": v for k, v in world.artifacts.items()},
+            'cultivator_map': {f"{k[0]},{k[1]}": v for k, v in world.cultivator_map.items()},
+            'structures': {
+                f"{k[0]},{k[1]}": {'type': v.struct_type, 'builder': v.builder_id, 'age': v.age, 'durability': v.durability, 'created': getattr(v, 'created_tick', 0)}
+                for k, v in world.structures.items()
+            },
+            'mega_resources': {
+                f"{k[0]},{k[1]}": {'value': v.value, 'req': v.required_agents}
+                for k, v in world.mega_resources.items()
+            }
+        }
 
-        if world:
-            dna['world_stats'] = world.get_stats()
+        agent_state = {}
+        for aid, a in self.agents.items():
+            if not a.alive: continue
+            agent_state[aid] = {
+                'x': int(a.x), 'y': int(a.y), 'energy': float(a.energy), 'age': int(a.age),
+                'health': float(a.health), 'alive': bool(a.alive), 'generation': int(a.generation),
+                'parent_ids': getattr(a, 'parent_ids', []),
+                'role': getattr(a, 'role', 'Generalist'),
+                'inventory': getattr(a, 'inventory', [0,0,0]),
+                'trade_count': int(getattr(a, 'trade_count', 0)),
+                'punish_count': int(getattr(a, 'punish_count', 0)),
+                'kuramoto_phase': float(getattr(a, 'kuramoto_phase', 0.0)),
+                'phi_value': float(getattr(a, 'phi_value', 0.0)),
+                'social_memory': getattr(a, 'social_memory', {}),
+                'causal_model': getattr(a, 'causal_model', {}),
+                'internal_phase': float(getattr(a, 'internal_phase', 0.0)),
+                'weather_vote': float(getattr(a, 'weather_vote', 0.0)),
+                'scratchpad': getattr(a, 'scratchpad', np.zeros((32,32))).tolist(),
+                'scratchpad_writes': int(getattr(a, 'scratchpad_writes', 0)),
+                'meme_pool': getattr(a, 'meme_pool', []),
+                'caste_gene': getattr(a, 'caste_gene', [0,0,0,0]),
+                'is_fertile': getattr(a, 'is_fertile', True),
+                'tribe_id': getattr(a, 'tribe_id', None),
+                'reputation': float(getattr(a, 'reputation', 0.0)),
+                'n_kills': int(getattr(a, 'n_kills', 0)),
+                'n_children': int(getattr(a, 'n_children', 0)),
+                'tools': getattr(a, 'tools', []),
+                'absorbed_inventions': getattr(a, 'absorbed_inventions', []),
+                'action_counts': getattr(a, 'action_counts', {}),
+                'soul_freqs': a.soul_freqs,
+                'brain_H': a.brain.H,
+                'brain_psi': a.brain.psi,
+                'discoveries': a.brain.discoveries,
+                'composed_actions': a.brain.composed_actions,
+                'emotions': a.brain.emotions,
+                'episodic_memory': getattr(a.brain, 'episodic_memory', []),
+                'qualia_memories': getattr(a.brain, 'qualia_memories', {}),
+                'other_models': getattr(a.brain, 'other_models', {}),
+                'prediction_errors': getattr(a.brain, 'prediction_errors', []),
+                'meta_H': a.meta.meta_H if hasattr(a, 'meta') and a.meta else None,
+                'meta_psi': a.meta.meta_psi if hasattr(a, 'meta') and a.meta else None,
+                'lr_field': a.meta.lr_field if hasattr(a, 'meta') and a.meta else None,
+                'meta_inventions': int(getattr(a.meta, 'n_meta_inventions', 0)) if hasattr(a, 'meta') and a.meta else 0,
+            }
 
-        return dna
+        return {
+            'timestamp': datetime.datetime.now().isoformat(),
+            'version': 'v3.0_immortal',
+            'engine': engine_state,
+            'world': world_state,
+            'agents': agent_state,
+            'civ': civ.freeze_civ()
+        }
+
+    def thaw_universe(self, state: dict, world: World, civ: CivilizationManager):
+        """Restores 100% of the mathematical state from the unzipped JSON dictionary."""
+        from world import Trap, Battery, Cultivator, Structure, MegaResource
+        
+        # 1. Restore Engine
+        eng = state['engine']
+        self.total_born = eng.get('total_born', 0)
+        self.total_died = eng.get('total_died', 0)
+        self.generation = eng.get('generation', 0)
+        self.pop_history = eng.get('pop_history', [])
+        self.energy_history = eng.get('energy_history', [])
+        self.inv_history = eng.get('inv_history', [])
+        self.meta_inv_history = eng.get('meta_inv_history', [])
+        self.novelty_history = eng.get('novelty_history', [])
+        self.cultural_continuity = eng.get('cultural_continuity', 0.0)
+        self.tradition_verified = eng.get('tradition_verified', False)
+        self.archetypes = eng.get('archetypes', {})
+        self.archetype_counts = eng.get('archetype_counts', {})
+        self.lineage = eng.get('lineage', {})
+        self.phylo.clades = {k: set(v) for k, v in eng.get('phylo_clades', {}).items()}
+        self.phylo.clade_history = eng.get('phylo_history', [])
+        self.phylo.cambrian_events = eng.get('phylo_cambrian', [])
+        self.gen_behavior_archive = {int(k): np.array(v) for k, v in eng.get('gen_behavior_archive', {}).items()}
+
+        # 2. Restore World Matrices
+        w_state = state['world']
+        world.step_count = w_state['step']
+        world.resources = np.array(w_state['resources'])
+        world.knowledge_field = np.array(w_state['knowledge_field'])
+        world.pheromone_grid = np.array(w_state['pheromone_grid'])
+        world.meme_grid = np.array(w_state['meme_grid'])
+        world.meme_hue_grid = np.array(w_state.get('meme_hue_grid', np.zeros((world.size, world.size))))
+        world.season = w_state.get('season', 0)
+        world.season_timer = w_state.get('season_timer', 0)
+        world.env_phase = w_state.get('env_phase', 0.0)
+        world.weather_amplitude = w_state.get('weather_amplitude', 1.0)
+        world.bonds = set(frozenset(b) for b in w_state.get('bonds', []))
+        world.kuramoto_order_parameter = w_state.get('kuramoto_order', 0.0)
+        world._event_log = w_state.get('event_log', [])
+
+        # Parse string keys "x,y" back to tuple (x,y)
+        def parse_pos(k_str):
+            p = k_str.split(',')
+            return (int(p[0]), int(p[1]))
+
+        world.artifacts = {parse_pos(k): v for k, v in w_state.get('artifacts', {}).items()}
+        world.cultivator_map = {parse_pos(k): v for k, v in w_state.get('cultivator_map', {}).items()}
+        
+        world.structures = {}
+        for k_str, s_data in w_state.get('structures', {}).items():
+            pos = parse_pos(k_str)
+            stype = s_data['type']
+            if stype == 'trap':
+                s = Trap(pos[0], pos[1], s_data['builder'])
+            elif stype == 'battery':
+                s = Battery(pos[0], pos[1], s_data['builder'])
+            elif stype == 'cultivator':
+                s = Cultivator(pos[0], pos[1], s_data['builder'])
+            else:
+                s = Structure(pos[0], pos[1], stype, s_data['builder'])
+            s.age = s_data.get('age', 0)
+            s.durability = s_data.get('durability', 100.0)
+            s.created_tick = s_data.get('created', 0)
+            world.structures[pos] = s
+
+        world.mega_resources = {}
+        for k_str, m_data in w_state.get('mega_resources', {}).items():
+            pos = parse_pos(k_str)
+            world.mega_resources[pos] = MegaResource(pos[0], pos[1], m_data['value'], m_data['req'])
+
+        # 3. Restore Civilization
+        civ.thaw_civ(state['civ'])
+
+        # 4. Resurrect Agents
+        self.agents = {}
+        for aid, adata in state['agents'].items():
+            a = BioHyperAgent(x=adata['x'], y=adata['y'], world_size=self.world_size, seed=0)
+            a.id = aid
+            a.parent_ids = adata.get('parent_ids', [])
+            a.energy = adata['energy']
+            a.age = adata['age']
+            a.health = adata['health']
+            a.alive = adata['alive']
+            a.generation = adata['generation']
+            a.role = adata['role']
+            a.inventory = adata['inventory']
+            a.trade_count = adata['trade_count']
+            a.punish_count = adata['punish_count']
+            a.kuramoto_phase = adata['kuramoto_phase']
+            a.phi_value = adata['phi_value']
+            a.social_memory = adata['social_memory']
+            a.causal_model = adata['causal_model']
+            a.internal_phase = adata.get('internal_phase', 0.0)
+            a.weather_vote = adata.get('weather_vote', 0.0)
+            a.scratchpad = np.array(adata.get('scratchpad', np.zeros((32,32))), dtype=np.int8)
+            a.scratchpad_writes = adata.get('scratchpad_writes', 0)
+            a.meme_pool = adata.get('meme_pool', [])
+            a.caste_gene = np.array(adata.get('caste_gene', [0,0,0,0]))
+            a.is_fertile = adata.get('is_fertile', True)
+            a.tribe_id = adata.get('tribe_id')
+            a.reputation = adata.get('reputation', 0.0)
+            a.n_kills = adata.get('n_kills', 0)
+            a.n_children = adata.get('n_children', 0)
+            a.tools = adata.get('tools', [])
+            a.absorbed_inventions = adata.get('absorbed_inventions', [])
+            a.action_counts = adata.get('action_counts', {})
+            a.soul_freqs = np.array(adata['soul_freqs'])
+
+            # ── Inject the Quantum Brain ──
+            a.brain.soul_freqs = a.soul_freqs
+            a.brain.H = np.array(adata['brain_H'])
+            a.brain.psi = np.array(adata['brain_psi'])
+            a.brain.discoveries = adata['discoveries']
+            a.brain.composed_actions = adata.get('composed_actions', {})
+            a.brain.emotions = np.array(adata['emotions'])
+            a.brain.episodic_memory = adata.get('episodic_memory', [])
+            a.brain.qualia_memories = {k: np.array(v) for k,v in adata.get('qualia_memories', {}).items()}
+            a.brain.other_models = {k: np.array(v) for k,v in adata.get('other_models', {}).items()}
+            a.brain.prediction_errors = adata.get('prediction_errors', [])
+
+            # ── Inject the Meta Brain ──
+            if adata.get('meta_H') is not None:
+                a.meta.meta_H = np.array(adata['meta_H'])
+                a.meta.meta_psi = np.array(adata['meta_psi'])
+                a.meta.lr_field = np.array(adata['lr_field'])
+                a.meta.n_meta_inventions = adata['meta_inventions']
+                a.meta._recache_meta()
+
+            a.brain._recache()
+            self.agents[aid] = a
+            
+        world.register_agents(list(self.agents.values()))
 
     # ── Utilities ────────────────────────────────────────────────────────────
 
