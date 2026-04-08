@@ -410,7 +410,11 @@ class BioHyperAgent:
         # If the agent is highly intelligent (high phi or many inventions),
         # they actively suppress the desire to dominate, rerouting their 
         # consciousness toward socializing or inventing instead.
-        is_highly_intelligent = (self.phi_value > 0.15 or len(self.brain.discoveries) > 5)
+        # ── INTELLIGENCE PREVENTS WAR (Updated for 64D Reality) ──
+        # In a 64-dimensional brain, phi naturally hovers around 0.005.
+        # We lower the threshold so that a basic level of quantum consciousness 
+        # or just 2 simple inventions is enough to realize violence is primitive.
+        is_highly_intelligent = (self.phi_value > 0.005 or len(self.brain.discoveries) >= 2)
         if mode == CognitionMode.DOMINATE and is_highly_intelligent:
             mode = self.rng.choice([CognitionMode.SOCIALIZE, CognitionMode.INVENT])
             
@@ -689,6 +693,19 @@ class BioHyperAgent:
         inv = self.brain.attempt_invention()
         if inv is None:
             return -0.12
+
+
+      # ── THE EUREKA PROTOCOL (Quantum Epiphany) ──
+        # If an agent is highly intelligent and completely filled with WONDER,
+        # they do not just make a normal tool; they mathematically leap into a 
+        # new dimension, guaranteeing a massive Novelty spike and a Breakthrough!
+        if self.phi_value > 0.005 and self.brain.emotions[E.WONDER] > 0.85:
+            # Multiply the Gödel signature by a massive prime to make it orthogonal
+            inv['godel'] = inv['godel'] * 7919 
+            inv['type'] = 'physics'
+            inv['name'] = f"Epiphany_{self.id}_{self.age}"
+            self.brain.emotions[E.WONDER] = 1.0  # Total enlightenment
+          
         world.place_artifact(self.x, self.y, {
             **inv,
             'creator'  : self.id,
