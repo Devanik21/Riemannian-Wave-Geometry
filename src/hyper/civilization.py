@@ -377,10 +377,13 @@ class CivilizationManager:
                             self.novelty_scorer.breakthroughs = []
                         
                         # Add it to the leaderboard
+                  
                         self.novelty_scorer.breakthroughs.append({
                             'name': name,
                             'novelty': float(novelty),
-                            'inventor': agent.id
+                            'inventor': agent.id,
+                            'godel': int(godel),          # <--- ADD THIS LINE
+                            'program': program
                         })
 
 
