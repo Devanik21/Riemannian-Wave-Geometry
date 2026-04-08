@@ -394,8 +394,12 @@ class CivilizationManager:
             phase = 2 * np.pi * idx / 16.0
             dim = (i * 3 + idx) % K_DIM
             psi[dim] += np.exp(1j * phase)
-        for k in range(min(8, K_DIM)):
-            psi[k] += np.exp(1j * godel * 0.01 * k) * 0.3
+        # ── 64D FRACTAL EXPANSION (The Fix) ──
+        # Fill all 64 dimensions with the Gödel resonance, not just the first 8.
+        # This allows the NoveltyScorer to detect massive standard deviation spikes!
+        for k in range(K_DIM):
+            psi[k] += np.exp(1j * godel * 0.0137 * k) * 0.3
+            
         norm = np.linalg.norm(psi)
         if norm > 1e-12:
             psi /= norm
