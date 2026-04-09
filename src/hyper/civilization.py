@@ -525,7 +525,8 @@ class CivilizationManager:
             'total_trades': getattr(self, 'total_trades', 0),
             'total_schisms': self.total_schisms,
             'extinctions': self.extinctions,
-            'civ_events': self.civ_events
+            'civ_events': self.civ_events,
+            'civ_rng': self.rng.get_state()
         }
 
     def thaw_civ(self, state: dict):
@@ -564,6 +565,9 @@ class CivilizationManager:
         self.total_schisms = state.get('total_schisms', 0)
         self.extinctions = state.get('extinctions', 0)
         self.civ_events = state.get('civ_events', [])
+        if 'civ_rng' in state:
+            c_r = state['civ_rng']
+            self.rng.set_state((c_r[0], np.array(c_r[1], dtype=np.uint32), c_r[2], c_r[3], c_r[4]))
 
   
     def tribe_leaderboard(self) -> List[dict]:
