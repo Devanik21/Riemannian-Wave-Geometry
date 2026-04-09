@@ -408,6 +408,9 @@ class EvolutionEngine:
                 'qualia_memories': getattr(a.brain, 'qualia_memories', {}),
                 'other_models': getattr(a.brain, 'other_models', {}),
                 'prediction_errors': getattr(a.brain, 'prediction_errors', []),
+                'n_comms': int(getattr(a.brain, 'n_comms', 0)),
+                'total_reward': float(getattr(a.brain, 'total_reward', 0.0)),
+                'confidence': float(getattr(a.brain, 'confidence', 1.0)),
                 'meta_H': a.meta.meta_H if hasattr(a, 'meta') and a.meta else None,
                 'meta_psi': a.meta.meta_psi if hasattr(a, 'meta') and a.meta else None,
                 'lr_field': a.meta.lr_field if hasattr(a, 'meta') and a.meta else None,
@@ -542,6 +545,9 @@ class EvolutionEngine:
             a.brain.qualia_memories = {k: np.array(v) for k,v in adata.get('qualia_memories', {}).items()}
             a.brain.other_models = {k: np.array(v) for k,v in adata.get('other_models', {}).items()}
             a.brain.prediction_errors = adata.get('prediction_errors', [])
+            a.brain.n_comms = adata.get('n_comms', 0)
+            a.brain.total_reward = adata.get('total_reward', 0.0)
+            a.brain.confidence = adata.get('confidence', 1.0)
 
             # ── Inject the Meta Brain ──
             if adata.get('meta_H') is not None:
