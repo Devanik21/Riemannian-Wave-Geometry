@@ -359,6 +359,7 @@ class EvolutionEngine:
             'event_log': getattr(world, '_event_log', []),
             'artifacts': {f"{k[0]},{k[1]}": v for k, v in world.artifacts.items()},
             'cultivator_map': {f"{k[0]},{k[1]}": v for k, v in world.cultivator_map.items()},
+            'world_rng': getattr(world, 'rng', np.random.RandomState(0)).get_state(),
             'structures': {
                 f"{k[0]},{k[1]}": {'type': v.struct_type, 'builder': v.builder_id, 'age': v.age, 'durability': v.durability, 'created': getattr(v, 'created_tick', 0)}
                 for k, v in world.structures.items()
@@ -476,6 +477,9 @@ class EvolutionEngine:
         world.bonds = set(frozenset(b) for b in w_state.get('bonds', []))
         world.kuramoto_order_parameter = w_state.get('kuramoto_order', 0.0)
         world._event_log = w_state.get('event_log', [])
+        if 'world_rng' in w_state:
+            w_r = w_state['world_rng']
+            world.rng.set_state((w_r[0], np.array(w_r[1], dtype=np.uint32), w_r[2], w_r[3], w_r[4]))
 
         # Parse string keys "x,y" back to tuple (x,y)
         def parse_pos(k_str):
